@@ -10,38 +10,45 @@ export async function trendHandler(
     const days = parseInt(request.query.get('days') ?? '30', 10);
     const db = getDb();
 
+    // Pull actuals from the most recent N days of available data
     const actuals = await db.query(
       `SELECT
          TO_CHAR(census_date, 'Mon DD') AS date,
          SUM(current_census)::int       AS actual
        FROM  hospital_census
-       WHERE census_date >= CURRENT_DATE - ($1 || ' days')::INTERVAL
+       WHERE census_date >= (SELECT MAX(census_date) FROM hospital_census) - ($1 || ' days')::INTERVAL
        GROUP BY census_date
        ORDER BY census_date ASC`,
       [days]
     );
 
-    const forecasts = await db.query(`
-      SELECT
-        TO_CHAR(forecast_date, 'Mon DD') AS date,
-        predicted_census                 AS forecast,
-        confidence_lower                 AS lower,
-        confidence_upper                 AS upper
-      FROM  forecast_data
-      WHERE hospital_id IS NULL
-        AND forecast_date >= CURRENT_DATE
-      ORDER BY forecast_date ASC
-    `);
-
     const historicalRows = actuals.rows as Record<string, unknown>[];
-    const forecastRows = forecasts.rows;
 
-    if (historicalRows.length > 0 && forecastRows.length > 0) {
-      historicalRows[historicalRows.length - 1].forecast = historicalRows[historicalRows.length - 1].actual;
+    // Generate a 7-day forward forecast by extrapolating from the last known value
+    if (historicalRows.length >= 2) {
+      const last = historicalRows[historicalRows.length - 1];
+      const prev = historicalRows[historicalRows.length - 2];
+      const lastVal = last.actual as number;
+      const prevVal = prev.actual as number;
+      const dailyDelta = Math.round((lastVal - prevVal) * 0.5); // dampened trend
+      // Stitch forecast onto last actual
+      last.forecast = lastVal;
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      for (let i = 1; i <= 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const label = `${months[d.getMonth()]} ${String(d.getDate()).padStart(2,'0')}`;
+        historicalRows.push({
+          date: label,
+          forecast: lastVal + dailyDelta * i,
+          lower: Math.round((lastVal + dailyDelta * i) * 0.97),
+          upper: Math.round((lastVal + dailyDelta * i) * 1.03),
+        });
+      }
     }
 
     return {
-      jsonBody: [...historicalRows, ...forecastRows],
+      jsonBody: historicalRows,
       headers: { 'Access-Control-Allow-Origin': '*' },
     };
   } catch (err) {

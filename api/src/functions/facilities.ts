@@ -9,6 +9,9 @@ export async function facilitiesHandler(
   try {
     const db = getDb();
     const { rows } = await db.query(`
+      WITH latest AS (
+        SELECT MAX(census_date) AS max_date FROM hospital_census
+      )
       SELECT
         h.name,
         hc.current_census                                              AS census,
@@ -26,7 +29,7 @@ export async function facilitiesHandler(
       LEFT JOIN hospital_census prev
         ON  prev.hospital_id = hc.hospital_id
         AND prev.census_date  = hc.census_date - INTERVAL '1 day'
-      WHERE hc.census_date = CURRENT_DATE
+      WHERE hc.census_date = (SELECT max_date FROM latest)
       ORDER BY occupancy DESC
       LIMIT 5
     `);
