@@ -70,7 +70,7 @@ function App() {
                     <MetricCard
                       title="7-Day Forecast"
                       value={census.sevenDayForecast ? `${Math.round((census.sevenDayForecast / census.totalCapacity) * 100)}%` : '—'}
-                      change={census.sevenDayForecast ? `+${census.sevenDayForecast - census.totalCensus} beds` : ''}
+                      change={census.sevenDayForecast ? `±${census.sevenDayForecast - census.totalCensus} beds` : ''}
                       subtext="Predicted Peak"
                       accentColor="#E75925"
                     />

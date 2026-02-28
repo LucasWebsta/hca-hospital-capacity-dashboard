@@ -150,46 +150,38 @@ async function handleAlerts(res) {
 
 // ── /api/trend ────────────────────────────────────────────────────────────────
 async function handleTrend(res, days = 30) {
-  // Daily Total Census summed across all facilities
-  const { rows: actuals } = await pool.query(`
-    SELECT
-      TO_CHAR(DATE(source_update_date), 'Mon DD') AS date,
-      ROUND(SUM(avg_by_fac))::int                 AS actual
-    FROM (
+  // Daily Total Census summed across all facilities, expressed as occupancy %
+  const { rows } = await pool.query(`
+    WITH daily AS (
       SELECT
-        facility_id,
-        DATE(source_update_date) AS d,
-        AVG(metric_value)        AS avg_by_fac
-      FROM facility_metrics
-      WHERE metric = 'Total Census'
-        AND source_update_date >= (
-          SELECT MAX(source_update_date) FROM facility_metrics WHERE metric = 'Total Census'
-        ) - ($1 || ' days')::INTERVAL
-      GROUP BY facility_id, DATE(source_update_date)
-    ) sub
-    GROUP BY DATE(source_update_date)
-    ORDER BY DATE(source_update_date) ASC
+        d,
+        ROUND(SUM(avg_by_fac))::int AS total_census
+      FROM (
+        SELECT
+          facility_id,
+          DATE(source_update_date) AS d,
+          AVG(metric_value)        AS avg_by_fac
+        FROM facility_metrics
+        WHERE metric = 'Total Census'
+          AND source_update_date >= (
+            SELECT MAX(source_update_date) FROM facility_metrics WHERE metric = 'Total Census'
+          ) - ($1 || ' days')::INTERVAL
+        GROUP BY facility_id, DATE(source_update_date)
+      ) sub
+      GROUP BY d
+    ),
+    cap AS (
+      SELECT SUM(capacity)::numeric AS total_capacity FROM facilities
+    )
+    SELECT
+      TO_CHAR(d, 'Mon DD') AS date,
+      total_census         AS actual,
+      ROUND((total_census / cap.total_capacity) * 100, 1)::float AS occupancy_pct
+    FROM daily, cap
+    ORDER BY d ASC
   `, [days]);
 
-  // Real forecast data
-  const { rows: forecasts } = await pool.query(`
-    SELECT
-      TO_CHAR(forecast_date, 'Mon DD') AS date,
-      predicted_census                 AS forecast,
-      confidence_lower                 AS lower,
-      confidence_upper                 AS upper
-    FROM forecast_data
-    WHERE hospital_id IS NULL
-      AND forecast_date >= CURRENT_DATE
-    ORDER BY forecast_date ASC
-  `);
-
-  const result = [...actuals];
-  if (result.length > 0 && forecasts.length > 0) {
-    result[result.length - 1].forecast = result[result.length - 1].actual;
-  }
-  result.push(...forecasts);
-  json(res, result);
+  json(res, rows);
 }
 
 // ── /api/forecast ─────────────────────────────────────────────────────────────
