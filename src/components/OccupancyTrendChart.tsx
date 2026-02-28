@@ -1,28 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { api } from '../api';
+import type { TrendPoint } from '../api';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
 
-const data = [
-  { date: 'Apr 10', actual: 820 },
-  { date: 'Apr 13', actual: 848 },
-  { date: 'Apr 16', actual: 862 },
-  { date: 'Apr 19', actual: 891 },
-  { date: 'Apr 22', actual: 908 },
-  { date: 'Apr 25', actual: 922 },
-  { date: 'Apr 28', actual: 938 },
-  { date: 'May 1',  actual: 948, forecast: 948 },
-  { date: 'May 3',  forecast: 963 },
-  { date: 'May 5',  forecast: 981 },
-  { date: 'May 7',  forecast: 1003 },
-];
-
 type Series = 'Overall' | 'ICU' | 'Emergency';
 
 export function OccupancyTrendChart() {
   const [activeSeries, setActiveSeries] = useState<Series>('Overall');
+  const [data, setData] = useState<TrendPoint[]>([]);
+
+  useEffect(() => {
+    api.getTrend(30).then(setData).catch(console.error);
+  }, []);
+
+  const lastActual = [...data].reverse().find(d => d.actual != null);
+  const lastForecast = [...data].reverse().find(d => d.forecast != null);
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
@@ -58,9 +54,9 @@ export function OccupancyTrendChart() {
           <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 500 }}>Forecast</span>
         </div>
         <div style={{ marginLeft: 'auto' }}>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_BLUE }}>948</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_BLUE }}>{lastActual?.actual ?? '—'}</span>
           <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>current</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_ORANGE, marginLeft: 8 }}>1,003</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_ORANGE, marginLeft: 8 }}>{lastForecast?.forecast?.toLocaleString() ?? '—'}</span>
           <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>forecast</span>
         </div>
       </div>

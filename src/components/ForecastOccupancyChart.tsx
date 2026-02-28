@@ -1,24 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { api } from '../api';
+import type { ForecastResponse } from '../api';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
 
-const baseData = [
-  { d: 'May 1', lo: 905, hi: 935, val: 915 },
-  { d: 'May 2', lo: 915, hi: 945, val: 930 },
-  { d: 'May 3', lo: 925, hi: 958, val: 940 },
-  { d: 'May 4', lo: 930, hi: 965, val: 948 },
-  { d: 'May 5', lo: 940, hi: 975, val: 958 },
-  { d: 'May 6', lo: 950, hi: 985, val: 968 },
-  { d: 'May 7', lo: 960, hi: 995, val: 978 },
-];
-
 type Days = '7' | '14' | '30' | '60';
 
 export function ForecastOccupancyChart() {
   const [days, setDays] = useState<Days>('7');
+  const [chartData, setChartData] = useState<{ d: string; val: number; lo: number; hi: number }[]>([]);
+  const [stats, setStats] = useState({ mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 });
+
+  useEffect(() => {
+    api.getForecast(parseInt(days, 10))
+      .then((res: ForecastResponse) => {
+        setChartData(res.data.map((item: Record<string, unknown>) => ({
+          d:   item.date      as string,
+          val: item.predicted as number,
+          lo:  (item.lower  ?? (item.predicted as number) - 30) as number,
+          hi:  (item.upper  ?? (item.predicted as number) + 30) as number,
+        })));
+        setStats(res.stats);
+      })
+      .catch(console.error);
+  }, [days]);
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
@@ -44,7 +52,7 @@ export function ForecastOccupancyChart() {
 
       {/* MAE / RMSE chips */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-        {[['MAE', '5.8'], ['RMSE', '8.2']].map(([k, v]) => (
+        {[['MAE', stats.mae.toFixed(1)], ['RMSE', stats.rmse.toFixed(1)]].map(([k, v]) => (
           <div key={k} style={{ background: '#e8eef8', borderRadius: 7, padding: '5px 10px', border: `1px solid rgba(9,34,64,0.1)` }}>
             <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8', marginRight: 4 }}>{k}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: BRAND_BLUE }}>{v}</span>
@@ -54,14 +62,14 @@ export function ForecastOccupancyChart() {
 
       {/* Big number */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 32, fontWeight: 800, color: BRAND_BLUE, letterSpacing: -1 }}>92.1%</span>
-        <span style={{ fontSize: 12.5, color: BRAND_ORANGE, fontWeight: 700, background: '#fdf0ec', padding: '3px 7px', borderRadius: 5 }}>±2.6% ↑</span>
+        <span style={{ fontSize: 32, fontWeight: 800, color: BRAND_BLUE, letterSpacing: -1 }}>{stats.accuracy}%</span>
+        <span style={{ fontSize: 12.5, color: BRAND_ORANGE, fontWeight: 700, background: '#fdf0ec', padding: '3px 7px', borderRadius: 5 }}>±{stats.upliftPct}% ↑</span>
         <span style={{ fontSize: 11.5, color: '#94a3b8', marginLeft: 2 }}>May 7</span>
       </div>
 
       {/* Chart */}
       <ResponsiveContainer width="100%" height={110}>
-        <AreaChart data={baseData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+        <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
           <defs>
             <linearGradient id="confBandBrand" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={BRAND_BLUE} stopOpacity={0.12} />

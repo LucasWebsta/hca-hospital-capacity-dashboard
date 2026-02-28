@@ -1,3 +1,7 @@
+import { useState, useEffect } from 'react';
+import { api } from '../api';
+import type { Alert } from '../api';
+
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
@@ -5,7 +9,17 @@ const BRAND_ORANGE = '#E75925';
 const miniBarData = [3, 5, 4, 7, 9, 8, 6, 10, 12, 9, 11, 8];
 const maxBar = Math.max(...miniBarData);
 
+function alertStyle(severity: string) {
+  if (severity === 'HIGH')   return { bg: '#fdf0ec', border: 'rgba(231,89,37,0.3)',  icon: '⚠️', iconBg: 'rgba(231,89,37,0.15)', textColor: '#7c2d12', timeColor: '#9a3412', badgeBg: BRAND_ORANGE,  badgeColor: '#fff'     };
+  if (severity === 'MEDIUM') return { bg: '#fffbeb', border: 'rgba(234,179,8,0.3)', icon: '⚠️', iconBg: 'rgba(234,179,8,0.15)',  textColor: '#713f12', timeColor: '#854d0e', badgeBg: '#eab308',     badgeColor: '#fff'     };
+  return                             { bg: '#f0fdf4', border: '#bbf7d0',             icon: '✅', iconBg: '#dcfce7',              textColor: '#166534', timeColor: '#15803d', badgeBg: '#bbf7d0',     badgeColor: '#15803d'  };
+}
+
 export function AlertsPanel() {
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  useEffect(() => {
+    api.getAlerts().then(setAlerts).catch(console.error);
+  }, []);
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 14, boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
 
@@ -13,7 +27,7 @@ export function AlertsPanel() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Alerts</div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>2 active notifications</div>
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{alerts.length} active notification{alerts.length !== 1 ? 's' : ''}</div>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button style={{
@@ -28,40 +42,26 @@ export function AlertsPanel() {
         </div>
       </div>
 
-      {/* Warning alert — HCA Orange */}
-      <div style={{
-        background: '#fdf0ec',
-        border: `1px solid rgba(231,89,37,0.3)`, borderRadius: 10, padding: '12px 14px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <div style={{ width: 28, height: 28, background: `rgba(231,89,37,0.15)`, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>⚠️</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: BRAND_BLUE }}>HCA Westside</span>
-              <span style={{ fontSize: 10, fontWeight: 700, background: BRAND_ORANGE, color: '#fff', borderRadius: 4, padding: '2px 6px' }}>HIGH</span>
+      {alerts.length === 0 ? (
+        <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: 12, padding: '8px 0' }}>No active alerts</div>
+      ) : alerts.map((a) => {
+        const s = alertStyle(a.severity);
+        return (
+          <div key={a.id} style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ width: 28, height: 28, background: s.iconBg, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>{s.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: BRAND_BLUE }}>{a.hospital}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: s.badgeBg, color: s.badgeColor, borderRadius: 4, padding: '2px 6px' }}>{a.severity}</span>
+                </div>
+                <div style={{ fontSize: 11.5, color: s.textColor }}>{a.message}</div>
+                <div style={{ fontSize: 10.5, color: s.timeColor, marginTop: 5, fontWeight: 500 }}>{new Date(a.triggered_at).toLocaleDateString()}</div>
+              </div>
             </div>
-            <div style={{ fontSize: 11.5, color: '#7c2d12' }}>Occupancy exceeded 90% threshold</div>
-            <div style={{ fontSize: 10.5, color: '#9a3412', marginTop: 5, fontWeight: 500 }}>May 7, 2025 · 2 hrs ago</div>
           </div>
-        </div>
-      </div>
-
-      {/* Success alert */}
-      <div style={{
-        background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 14px',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-          <div style={{ width: 28, height: 28, background: '#dcfce7', borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>✅</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: BRAND_BLUE }}>Central Regional</span>
-              <span style={{ fontSize: 10, fontWeight: 700, background: '#bbf7d0', color: '#15803d', borderRadius: 4, padding: '2px 6px' }}>OK</span>
-            </div>
-            <div style={{ fontSize: 11.5, color: '#166534' }}>Back below 95% capacity threshold</div>
-            <div style={{ fontSize: 10.5, color: '#15803d', marginTop: 5, fontWeight: 500 }}>May 7, 2025 · 5 hrs ago</div>
-          </div>
-        </div>
-      </div>
+        );
+      })}
 
       {/* Create Alert button — HCA Orange CTA */}
       <button style={{
