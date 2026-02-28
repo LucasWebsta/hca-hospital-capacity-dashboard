@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 import {
   Sidebar,
   Header,
@@ -7,41 +7,134 @@ import {
   ForecastOccupancyChart,
   FacilitiesAtRisk,
   AlertsPanel,
-} from './components';
-import './App.css';
+} from "./components";
+import ForecastPage from "./components/ForecastPage";
+import "./App.css";
 
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#edf1f8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflow: 'hidden' }}>
+    <div
+      style={{
+        display: "flex",
+        height: "100vh",
+        background: "#edf1f8",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        overflow: "hidden",
+      }}
+    >
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
         <Header />
 
-        {activeTab === 'dashboard' && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+        {activeTab === "dashboard" && (
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
             {/* Page heading */}
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', letterSpacing: -0.3 }}>Census Command</div>
-              <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 3, fontWeight: 500 }}>Real-time hospital occupancy · Updated just now</div>
+              <div
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  letterSpacing: -0.3,
+                }}
+              >
+                Census Command
+              </div>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "#94a3b8",
+                  marginTop: 3,
+                  fontWeight: 500,
+                }}
+              >
+                Real-time hospital occupancy · Updated just now
+              </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 330px', gap: 22, alignItems: 'start', maxWidth: 1440 }}>
-
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 330px",
+                gap: 22,
+                alignItems: "start",
+                maxWidth: 1440,
+              }}
+            >
               {/* LEFT COLUMN */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 20 }}
+              >
                 {/* Overview card with metrics */}
-                <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <div
+                  style={{
+                    background: "#fff",
+                    borderRadius: 12,
+                    border: "1px solid #edf0f5",
+                    padding: "20px 22px",
+                    boxShadow:
+                      "0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 16,
+                    }}
+                  >
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Hospital System Overview</div>
-                      <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Across 5 facilities · May 7, 2025</div>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 14,
+                          color: "#0f172a",
+                        }}
+                      >
+                        Hospital System Overview
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11.5,
+                          color: "#94a3b8",
+                          marginTop: 2,
+                        }}
+                      >
+                        Across 5 facilities · May 7, 2025
+                      </div>
                     </div>
-                    <span style={{ fontSize: 11, background: '#f0fdf4', color: '#16a34a', borderRadius: 5, padding: '3px 9px', fontWeight: 700, border: '1px solid #bbf7d0' }}>● Live</span>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        background: "#f0fdf4",
+                        color: "#16a34a",
+                        borderRadius: 5,
+                        padding: "3px 9px",
+                        fontWeight: 700,
+                        border: "1px solid #bbf7d0",
+                      }}
+                    >
+                      ● Live
+                    </span>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(4, 1fr)",
+                      gap: 16,
+                    }}
+                  >
                     <MetricCard
                       title="Current Census"
                       value={948}
@@ -81,25 +174,86 @@ function App() {
               </div>
 
               {/* RIGHT COLUMN */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 20 }}
+              >
                 <ForecastOccupancyChart />
                 <AlertsPanel />
               </div>
-
             </div>
           </div>
         )}
 
-        {activeTab !== 'dashboard' && (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ textAlign: 'center' }}>
-              <h3 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
-                {activeTab === 'forecast' && 'Forecast & Analysis'}
-                {activeTab === 'alerts' && 'Alerts & Notifications'}
-                {activeTab === 'settings' && 'Settings'}
-                {activeTab === 'reports' && 'Reports'}
+        {activeTab === "forecast" && <ForecastPage />}
+        {activeTab === "alerts" && (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <h3
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "#111827",
+                  marginBottom: 8,
+                }}
+              >
+                Alerts & Notifications
               </h3>
-              <p style={{ color: '#6b7280' }}>Coming soon...</p>
+              <p style={{ color: "#6b7280" }}>Coming soon...</p>
+            </div>
+          </div>
+        )}
+        {activeTab === "settings" && (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <h3
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "#111827",
+                  marginBottom: 8,
+                }}
+              >
+                Settings
+              </h3>
+              <p style={{ color: "#6b7280" }}>Coming soon...</p>
+            </div>
+          </div>
+        )}
+        {activeTab === "reports" && (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <h3
+                style={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: "#111827",
+                  marginBottom: 8,
+                }}
+              >
+                Reports
+              </h3>
+              <p style={{ color: "#6b7280" }}>Coming soon...</p>
             </div>
           </div>
         )}
