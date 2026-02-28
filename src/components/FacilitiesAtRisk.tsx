@@ -1,14 +1,21 @@
+import { useState, useEffect } from 'react';
+import { api } from '../api';
+import type { Facility } from '../api';
+
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
 
-const facilities = [
-  { name: 'Central Regional',          census: 428, occupancy: 94.7, trend: '▲', color: '#dc2626', bg: '#fef2f2' },
-  { name: 'HCA Westside',              census: 201, occupancy: 90.1, trend: '▲', color: BRAND_ORANGE, bg: '#fdf0ec' },
-  { name: 'HCA Memorial Hospital East',census: 180, occupancy: 88.3, trend: '▲', color: BRAND_ORANGE, bg: '#fdf0ec' },
-  { name: 'HCA Northside',             census: 139, occupancy: 81.2, trend: '▼', color: '#16a34a', bg: '#f0fdf4' },
-  { name: 'HCA Southside',             census: 124, occupancy: 78.5, trend: '▼', color: '#16a34a', bg: '#f0fdf4' },
-];
+function riskColor(occ: number) {
+  if (occ >= 90) return '#dc2626';
+  if (occ >= 85) return BRAND_ORANGE;
+  return '#16a34a';
+}
+function riskBg(occ: number) {
+  if (occ >= 90) return '#fef2f2';
+  if (occ >= 85) return '#fdf0ec';
+  return '#f0fdf4';
+}
 
 function OccupancyBar({ value, color }: { value: number; color: string }) {
   return (
@@ -22,6 +29,16 @@ function OccupancyBar({ value, color }: { value: number; color: string }) {
 }
 
 export function FacilitiesAtRisk() {
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getFacilities()
+      .then(setFacilities)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -48,11 +65,18 @@ export function FacilitiesAtRisk() {
           </tr>
         </thead>
         <tbody>
-          {facilities.map((f) => (
+          {loading ? (
+            <tr><td colSpan={4} style={{ padding: 20, textAlign: 'center', color: '#94a3b8', fontSize: 12 }}>Loading...</td></tr>
+          ) : facilities.map((f) => {
+            const occ = Number(f.occupancy);
+            const color = riskColor(occ);
+            const bg = riskBg(occ);
+            const arrow = f.trend === 'up' ? '▲' : f.trend === 'down' ? '▼' : '–';
+            return (
             <tr key={f.name} style={{ borderBottom: '1px solid #f8fafc' }}>
               <td style={{ padding: '11px 0', fontSize: 13, fontWeight: 500, color: '#1e293b', maxWidth: 160 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: f.color, flexShrink: 0 }} />
+                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                 </div>
               </td>
@@ -60,17 +84,18 @@ export function FacilitiesAtRisk() {
                 {f.census}
               </td>
               <td style={{ padding: '11px 0', textAlign: 'right', paddingRight: 8 }}>
-                <OccupancyBar value={f.occupancy} color={f.color} />
+                <OccupancyBar value={occ} color={color} />
               </td>
               <td style={{ padding: '11px 0', textAlign: 'center' }}>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   width: 24, height: 24, borderRadius: 6,
-                  background: f.bg, fontSize: 11, fontWeight: 700, color: f.color,
-                }}>{f.trend}</span>
+                  background: bg, fontSize: 11, fontWeight: 700, color,
+                }}>{arrow}</span>
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
