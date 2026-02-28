@@ -1,26 +1,37 @@
 import pg from 'pg';
 const { Pool } = pg;
 const pool = new Pool({
-  connectionString: 'postgresql://neondb_owner:npg_STpuvGNwJ8e9@ep-proud-grass-ailc7qt3-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require',
+  connectionString: 'postgresql://neondb_owner:npg_STpuvGNwJ8e9@ep-proud-grass-ailc7qt3-pooler.c-4.us-east-1.aws.neon.tech/neondb',
   ssl: { rejectUnauthorized: false }
 });
 
-const { rows: tables } = await pool.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename");
+// All tables
+const { rows: tables } = await pool.query("SELECT schemaname, tablename FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema') ORDER BY schemaname, tablename");
 console.log('=== TABLES ===');
-console.log(tables.map(r => r.tablename).join(', ') || 'NONE');
+tables.forEach(r => console.log(` ${r.schemaname}.${r.tablename}`));
 
-const names = tables.map(r => r.tablename);
+// facilities
+const { rows: fac } = await pool.query('SELECT id, name, capacity, region, facility_id FROM facilities ORDER BY id');
+console.log(`\n=== FACILITIES (${fac.length} rows) ===`);
+fac.forEach(r => console.log(` id=${r.id} fid=${r.facility_id} | ${r.name} | cap=${r.capacity} | ${r.region}`));
 
-if (names.includes('hospitals')) {
-  const { rows: h } = await pool.query('SELECT id, name, capacity, region FROM hospitals ORDER BY id');
-  console.log(`\n=== HOSPITALS (${h.length} rows) ===`);
-  h.forEach(r => console.log(` id=${r.id} | ${r.name} | cap=${r.capacity} | ${r.region}`));
-}
+// facility_metrics summary
+const { rows: msum } = await pool.query(`SELECT facility_id, metric, COUNT(*)::int as n, MIN(source_update_date)::text as oldest, MAX(source_update_date)::text as newest, ROUND(AVG(metric_value),1)::float as avg_val FROM facility_metrics GROUP BY facility_id, metric ORDER BY facility_id, metric`);
+console.log(`\n=== FACILITY_METRICS summary ===`);
+msum.forEach(r => console.log(` fid=${r.facility_id} [${r.metric}] ${r.n} rows | ${r.oldest} -> ${r.newest} | avg=${r.avg_val}`));
 
-if (names.includes('hospital_census')) {
-  const { rows: c } = await pool.query('SELECT hospital_id, COUNT(*)::int as days, MIN(census_date)::date as from, MAX(census_date)::date as to FROM hospital_census GROUP BY hospital_id ORDER BY hospital_id');
-  console.log(`\n=== HOSPITAL_CENSUS coverage ===`);
-  c.forEach(r => console.log(` hospital_id=${r.hospital_id}: ${r.days} rows | ${r.from} -> ${r.to}`));
-}
+// forecast_data
+const { rows: fc } = await pool.query('SELECT COUNT(*)::int as n, MIN(forecast_date)::text as start, MAX(forecast_date)::text as end FROM forecast_data');
+console.log(`\n=== FORECAST_DATA: ${fc[0].n} rows | ${fc[0].start} -> ${fc[0].end} ===`);
+const { rows: fcsample } = await pool.query('SELECT * FROM forecast_data ORDER BY forecast_date LIMIT 3');
+fcsample.forEach(r => console.log(` ${JSON.stringify(r)}`));
+
+// alerts columns
+const { rows: acols } = await pool.query("SELECT column_name, data_type FROM information_schema.columns WHERE table_name='alerts' AND table_schema='public' ORDER BY ordinal_position");
+console.log(`\n=== ALERTS columns ===`);
+console.log(' ', acols.map(c => `${c.column_name}:${c.data_type}`).join(', ') || '(no columns)');
+const { rows: arows } = await pool.query('SELECT * FROM alerts LIMIT 5');
+if (arows.length) arows.forEach(r => console.log(' ', JSON.stringify(r)));
+else console.log('  (empty)');
 
 await pool.end();
