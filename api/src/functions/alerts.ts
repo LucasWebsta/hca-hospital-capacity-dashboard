@@ -2,14 +2,13 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { getDb } from '../db';
 
 // GET /api/alerts
-// Returns active alerts sorted by severity
 export async function alertsHandler(
-  request: HttpRequest,
+  _request: HttpRequest,
   context: InvocationContext
 ): Promise<HttpResponseInit> {
   try {
-    const pool = await getDb();
-    const result = await pool.request().query(`
+    const db = getDb();
+    const { rows } = await db.query(`
       SELECT
         a.id,
         h.name        AS hospital,
@@ -18,9 +17,9 @@ export async function alertsHandler(
         a.triggered_at,
         a.resolved_at,
         a.is_active
-      FROM dbo.Alerts a
-      INNER JOIN dbo.Hospitals h ON a.hospital_id = h.id
-      WHERE a.is_active = 1
+      FROM  alerts a
+      JOIN  hospitals h ON a.hospital_id = h.id
+      WHERE a.is_active = TRUE
       ORDER BY
         CASE a.severity
           WHEN 'HIGH'   THEN 1
@@ -31,9 +30,8 @@ export async function alertsHandler(
         END,
         a.triggered_at DESC
     `);
-
     return {
-      jsonBody: result.recordset,
+      jsonBody: rows,
       headers: { 'Access-Control-Allow-Origin': '*' },
     };
   } catch (err) {
@@ -42,8 +40,4 @@ export async function alertsHandler(
   }
 }
 
-app.http('alerts', {
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  handler: alertsHandler,
-});
+app.http('alerts', { methods: ['GET'], authLevel: 'anonymous', handler: alertsHandler });

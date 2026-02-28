@@ -2,30 +2,32 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { getDb } from '../db';
 
 // GET /api/census
-// Returns network-wide totals for the metric cards
 export async function censusHandler(
-  request: HttpRequest,
+  _request: HttpRequest,
   context: InvocationContext
 ): Promise<HttpResponseInit> {
   try {
-    const pool = await getDb();
-    const result = await pool.request().query(`
+    const db = getDb();
+    const { rows } = await db.query(`
       SELECT
-        SUM(hc.current_census)                                    AS totalCensus,
-        SUM(h.capacity)                                           AS totalCapacity,
-        CAST(SUM(hc.current_census) AS FLOAT)
-          / NULLIF(SUM(h.capacity), 0) * 100                     AS occupancyRate,
-        (SELECT TOP 1 predicted_census
-           FROM dbo.ForecastData
-           WHERE hospital_id IS NULL
-           ORDER BY forecast_date ASC)                            AS sevenDayForecast
-      FROM dbo.HospitalCensus hc
-      INNER JOIN dbo.Hospitals h ON hc.hospital_id = h.id
-      WHERE hc.census_date = CAST(GETDATE() AS DATE)
+        SUM(hc.current_census)::int                                       AS "totalCensus",
+        SUM(h.capacity)::int                                              AS "totalCapacity",
+        ROUND(
+          (SUM(hc.current_census)::numeric / NULLIF(SUM(h.capacity),0)) * 100, 1
+        )                                                                  AS "occupancyRate",
+        (
+          SELECT predicted_census
+          FROM   forecast_data
+          WHERE  hospital_id IS NULL
+          ORDER  BY forecast_date ASC
+          LIMIT  1
+        )                                                                  AS "sevenDayForecast"
+      FROM  hospital_census hc
+      JOIN  hospitals h ON hc.hospital_id = h.id
+      WHERE hc.census_date = CURRENT_DATE
     `);
-
     return {
-      jsonBody: result.recordset[0],
+      jsonBody: rows[0],
       headers: { 'Access-Control-Allow-Origin': '*' },
     };
   } catch (err) {
@@ -34,8 +36,4 @@ export async function censusHandler(
   }
 }
 
-app.http('census', {
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  handler: censusHandler,
-});
+app.http('census', { methods: ['GET'], authLevel: 'anonymous', handler: censusHandler });

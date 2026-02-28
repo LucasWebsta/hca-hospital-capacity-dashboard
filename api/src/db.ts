@@ -1,26 +1,20 @@
-import sql from 'mssql';
+import { Pool } from 'pg';
 
-const config: sql.config = {
-  server: process.env.SQL_SERVER!,
-  database: process.env.SQL_DATABASE!,
-  user: process.env.SQL_USER,
-  password: process.env.SQL_PASSWORD,
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-  pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000,
-  },
-};
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
 
-let pool: sql.ConnectionPool | null = null;
+// Singleton pool — re-used across warm function invocations
+let pool: Pool | null = null;
 
-export async function getDb(): Promise<sql.ConnectionPool> {
-  if (!pool || !pool.connected) {
-    pool = await sql.connect(config);
+export function getDb(): Pool {
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }, // required for Neon
+      max: 5,
+      idleTimeoutMillis: 30000,
+    });
   }
   return pool;
 }

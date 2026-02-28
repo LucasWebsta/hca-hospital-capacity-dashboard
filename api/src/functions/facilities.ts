@@ -2,39 +2,36 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/fu
 import { getDb } from '../db';
 
 // GET /api/facilities
-// Returns top facilities ranked by occupancy rate
 export async function facilitiesHandler(
-  request: HttpRequest,
+  _request: HttpRequest,
   context: InvocationContext
 ): Promise<HttpResponseInit> {
   try {
-    const pool = await getDb();
-    const result = await pool.request().query(`
-      SELECT TOP 5
+    const db = getDb();
+    const { rows } = await db.query(`
+      SELECT
         h.name,
-        hc.current_census                                         AS census,
-        CAST(hc.current_census AS FLOAT)
-          / NULLIF(h.capacity, 0) * 100                          AS occupancy,
+        hc.current_census                                              AS census,
+        ROUND(
+          (hc.current_census::numeric / NULLIF(h.capacity, 0)) * 100, 1
+        )                                                              AS occupancy,
         h.capacity,
-        -- compare to yesterday to get trend
         CASE
-          WHEN hc.current_census > ISNULL(prev.current_census, hc.current_census)
-            THEN 'up'
-          WHEN hc.current_census < ISNULL(prev.current_census, hc.current_census)
-            THEN 'down'
+          WHEN hc.current_census > COALESCE(prev.current_census, hc.current_census) THEN 'up'
+          WHEN hc.current_census < COALESCE(prev.current_census, hc.current_census) THEN 'down'
           ELSE 'flat'
         END AS trend
-      FROM dbo.HospitalCensus hc
-      INNER JOIN dbo.Hospitals h ON hc.hospital_id = h.id
-      LEFT JOIN dbo.HospitalCensus prev
-        ON prev.hospital_id = hc.hospital_id
-        AND prev.census_date = DATEADD(DAY, -1, hc.census_date)
-      WHERE hc.census_date = CAST(GETDATE() AS DATE)
+      FROM  hospital_census hc
+      JOIN  hospitals h  ON hc.hospital_id = h.id
+      LEFT JOIN hospital_census prev
+        ON  prev.hospital_id = hc.hospital_id
+        AND prev.census_date  = hc.census_date - INTERVAL '1 day'
+      WHERE hc.census_date = CURRENT_DATE
       ORDER BY occupancy DESC
+      LIMIT 5
     `);
-
     return {
-      jsonBody: result.recordset,
+      jsonBody: rows,
       headers: { 'Access-Control-Allow-Origin': '*' },
     };
   } catch (err) {
@@ -43,8 +40,4 @@ export async function facilitiesHandler(
   }
 }
 
-app.http('facilities', {
-  methods: ['GET'],
-  authLevel: 'anonymous',
-  handler: facilitiesHandler,
-});
+app.http('facilities', { methods: ['GET'], authLevel: 'anonymous', handler: facilitiesHandler });
