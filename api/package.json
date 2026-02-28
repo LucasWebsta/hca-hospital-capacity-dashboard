@@ -1,0 +1,21 @@
+{
+  "name": "hca-census-api",
+  "version": "1.0.0",
+  "description": "HCA Census Command Azure Functions API",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "func start",
+    "dev": "npm run build && func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "typescript": "^5.0.0"
+  },
+  "main": "dist/src/functions/*.js"
+}
