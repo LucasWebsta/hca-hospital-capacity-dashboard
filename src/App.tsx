@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Sidebar,
   Header,
@@ -8,10 +8,19 @@ import {
   FacilitiesAtRisk,
   AlertsPanel,
 } from './components';
+import { api } from './api';
+import type { CensusMetrics } from './api';
 import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [census, setCensus] = useState<CensusMetrics>({
+    totalCensus: 948, totalCapacity: 1112, occupancyRate: 85.2, sevenDayForecast: 963,
+  });
+
+  useEffect(() => {
+    api.getCensusMetrics().then(setCensus).catch(console.error);
+  }, []);
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#edf1f8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflow: 'hidden' }}>
@@ -44,30 +53,30 @@ function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
                     <MetricCard
                       title="Current Census"
-                      value={948}
-                      unit="1,112"
+                      value={census.totalCensus}
+                      unit={census.totalCapacity.toLocaleString()}
                       change="+7 beds"
                       subtext="Occupied Beds"
                       accentColor="#092240"
                     />
                     <MetricCard
                       title="Occupancy Rate"
-                      value="85.2%"
-                      change="+13.5%"
+                      value={`${Number(census.occupancyRate).toFixed(1)}%`}
+                      change=""
                       subtext="of total capacity"
-                      progressBar="85%"
+                      progressBar={`${Math.round(Number(census.occupancyRate))}%`}
                       accentColor="#092240"
                     />
                     <MetricCard
                       title="7-Day Forecast"
-                      value="92.1%"
-                      change="+114 beds"
+                      value={census.sevenDayForecast ? `${Math.round((census.sevenDayForecast / census.totalCapacity) * 100)}%` : '—'}
+                      change={census.sevenDayForecast ? `+${census.sevenDayForecast - census.totalCensus} beds` : ''}
                       subtext="Predicted Peak"
                       accentColor="#E75925"
                     />
                     <MetricCard
                       title="Risk Level"
-                      value="Moderate"
+                      value={Number(census.occupancyRate) >= 90 ? 'High' : Number(census.occupancyRate) >= 85 ? 'Moderate' : 'Normal'}
                       type="alert"
                     />
                   </div>
