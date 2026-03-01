@@ -17,11 +17,11 @@ export async function rawMetricsHandler(
 
         const db = getDb();
         const { rows } = await db.query(
-            `SELECT facility_id, metric, source_update_date, metric_value
-             FROM facility_metrics
+            `SELECT facility_id, update_utc, admissions, discharges, births, icu_occupancy, total_census
+             FROM facility_metrics_wide
              WHERE facility_id = $1
-             AND source_update_date >= NOW() - INTERVAL '60 days'
-             ORDER BY source_update_date ASC`,
+             AND update_utc >= NOW() - INTERVAL '60 days'
+             ORDER BY update_utc ASC`,
             [facilityId]
         );
         return {

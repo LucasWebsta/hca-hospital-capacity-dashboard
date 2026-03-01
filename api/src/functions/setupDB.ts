@@ -9,21 +9,18 @@ export async function setupDbHandler(
         const db = getDb();
         
         await db.query(`
-            CREATE MATERIALIZED VIEW IF NOT EXISTS facility_metrics_recent AS
-            SELECT facility_id, metric, source_update_date, metric_value
-            FROM facility_metrics
-            WHERE source_update_date >= NOW() - INTERVAL '60 days'
-            ORDER BY facility_id, source_update_date ASC
+            CREATE INDEX IF NOT EXISTS idx_fmw_facility_update
+            ON facility_metrics_wide (facility_id, update_utc DESC)
         `);
 
         await db.query(`
-            CREATE INDEX IF NOT EXISTS idx_facility_metrics_recent 
-            ON facility_metrics_recent (facility_id, source_update_date)
+            CREATE INDEX IF NOT EXISTS idx_fmw_update_utc
+            ON facility_metrics_wide (update_utc DESC)
         `);
 
         return {
             status: 200,
-            jsonBody: { message: 'Materialized view created successfully' },
+            jsonBody: { message: 'Indexes on facility_metrics_wide created successfully' },
             headers: { 'Access-Control-Allow-Origin': '*' },
         };
     } catch (err) {

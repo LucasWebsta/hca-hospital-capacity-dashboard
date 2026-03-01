@@ -6,10 +6,11 @@ import {
   MetricCard,
   OccupancyTrendChart,
   ForecastOccupancyChart,
-  FacilitiesAtRisk,
   AlertsPanel,
+  AlertsWidget,
   ReportsPanel,
   InfoTooltip,
+  FacilityMap,
 } from "./components";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import ForecastPage from "./components/ForecastPage";
@@ -45,9 +46,14 @@ function App() {
     }
     return 30;
   });
-  const [selectedFacilityId, setSelectedFacilityId] = useState<number | null>(
-    null,
-  );
+  const [selectedFacilityId, setSelectedFacilityId] = useState<number | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('user');
+      if (!raw) return null;
+      const user = JSON.parse(raw) as { homeFacilityId?: number };
+      return user?.homeFacilityId ?? null;
+    } catch { return null; }
+  });
   const [selectedFacilityName, setSelectedFacilityName] =
     useState("All Facilities");
   const [census, setCensus] = useState<CensusMetrics>({
@@ -107,7 +113,7 @@ function App() {
 
       <Sidebar 
         activeTab={activeTab} 
-        onTabChange={(tab) => {
+        onTabChange={(tab: string) => {
           setActiveTab(tab);
           setSidebarOpen(false);
         }} 
@@ -266,6 +272,7 @@ function App() {
                             ? "Moderate"
                             : "Normal"
                       }
+                      progressBar={`${Math.min(Math.round(Number(census.occupancyRate)), 100)}%`}
                       type="alert"
                       tooltip="Overall risk based on occupancy: High (≥90%), Moderate (≥85%), or Normal."
                       expanded={metricTooltipsOn ? overviewMetricsExpanded : false}
@@ -273,12 +280,24 @@ function App() {
                   </div>
                 </div>
 
+                <FacilityMap
+                  selectedFacilityId={selectedFacilityId}
+                  defaultFacilityId={(() => {
+                    try {
+                      const raw = sessionStorage.getItem('user');
+                      if (!raw) return null;
+                      const u = JSON.parse(raw) as { homeFacilityId?: number };
+                      return u?.homeFacilityId ?? null;
+                    } catch { return null; }
+                  })()}
+                  onFacilitySelect={(id, name) => {
+                    setSelectedFacilityId(id);
+                    setSelectedFacilityName(name);
+                  }}
+                />
+
                 <OccupancyTrendChart
                   days={trendDays}
-                  facilityId={selectedFacilityId ?? undefined}
-                  tooltipsOn={metricTooltipsOn}
-                />
-                <FacilitiesAtRisk
                   facilityId={selectedFacilityId ?? undefined}
                   tooltipsOn={metricTooltipsOn}
                 />
@@ -291,7 +310,7 @@ function App() {
                   facilityId={selectedFacilityId ?? undefined}
                   tooltipsOn={metricTooltipsOn}
                 />
-                <AlertsPanel tooltipsOn={metricTooltipsOn} />
+                <AlertsWidget facilityId={selectedFacilityId} />
               </div>
             </div>
 
@@ -351,35 +370,7 @@ function App() {
 
         {activeTab === "forecast" && <ForecastPage />}
 
-        {activeTab === "alerts" && (
-          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 16px" : "20px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  letterSpacing: -0.3,
-                }}
-              >
-                Alerts & Notifications
-              </div>
-              <div
-                style={{
-                  fontSize: 12.5,
-                  color: "#94a3b8",
-                  marginTop: 3,
-                  fontWeight: 500,
-                }}
-              >
-                Create and manage your alert rules
-              </div>
-            </div>
-            <div style={{ width: "100%" }}>
-              <AlertsPanel tooltipsOn={metricTooltipsOn} />
-            </div>
-          </div>
-        )}
+        {activeTab === "alerts" && <AlertsPanel tooltipsOn={metricTooltipsOn} />}
 
         {activeTab === "reports" && (
           <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 16px" : "20px 28px" }} className="reports-print-container">
