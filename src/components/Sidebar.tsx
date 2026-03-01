@@ -1,4 +1,5 @@
 import { Bell, FileText, Home, Activity } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -8,6 +9,8 @@ interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   facilityName?: string;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 const navItems = [
@@ -17,14 +20,54 @@ const navItems = [
   { id: 'reports', label: 'Reports', icon: FileText },
 ];
 
-export function Sidebar({ activeTab, onTabChange, facilityName }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, facilityName, isOpen = true, onClose }: SidebarProps) {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
   return (
     <div style={{
       width: 224, minWidth: 224,
       background: `linear-gradient(170deg, #061525 0%, ${BRAND_BLUE} 50%, #0d2d54 100%)`,
       color: '#fff', display: 'flex', flexDirection: 'column', height: '100vh',
       boxShadow: '2px 0 20px rgba(6,21,37,0.35)',
+      position: isMobile ? 'fixed' : 'relative',
+      left: isMobile ? (isOpen ? 0 : -224) : 0,
+      zIndex: 999,
+      transition: isMobile ? 'left 0.3s ease' : 'none',
     }}>
+      {/* Close button for mobile */}
+      {isMobile && isOpen && (
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.1)',
+            border: 'none',
+            color: '#fff',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 20,
+            zIndex: 1000,
+          }}
+        >
+          ×
+        </button>
+      )}
 
       {/* Logo */}
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>

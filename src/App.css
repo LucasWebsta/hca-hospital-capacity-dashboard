@@ -3,6 +3,19 @@
   height: 100%;
 }
 
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Ensure touch-friendly tap targets */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
 /* Print: show only report content when on Reports page */
 @media print {
   body * {
