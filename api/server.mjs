@@ -682,6 +682,40 @@ async function handleForecast(res, days = 7, facilityId = null) {
   json(res, { data: rows, stats: { mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 } });
 }
 
+// ── Raw Metrics ─────────────────────────────────────────────────────────────
+async function handleRawMetrics(res, facilityId) {
+  if (!facilityId) { json(res, { error: 'facilityId is required' }, 400); return; }
+  const { rows } = await pool.query(
+    `SELECT facility_id, update_utc, admissions, discharges, births, icu_occupancy, total_census
+     FROM facility_metrics_wide
+     WHERE facility_id = $1
+       AND update_utc >= NOW() - INTERVAL '60 days'
+     ORDER BY update_utc ASC`,
+    [facilityId]
+  );
+  // Return in the shape loadData.ts expects
+  const mapped = [];
+  const metricMap = {
+    admissions: 'Admissions',
+    discharges: 'Discharges',
+    icu_occupancy: 'ICU Occupancy',
+    total_census: 'Total Census',
+  };
+  for (const row of rows) {
+    for (const [col, label] of Object.entries(metricMap)) {
+      if (row[col] != null) {
+        mapped.push({
+          facility_id: row.facility_id,
+          metric: label,
+          source_update_date: row.update_utc,
+          metric_value: row[col],
+        });
+      }
+    }
+  }
+  json(res, mapped);
+}
+
 // ── Router ────────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
@@ -714,6 +748,7 @@ const server = http.createServer(async (req, res) => {
     if (path === '/alerts')          return await handleAlerts(res, userId);
     if (path === '/trend')           return await handleTrend(res, days, facilityId);
     if (path === '/forecast')        return await handleForecast(res, days, facilityId);
+    if (path === '/rawMetrics')       return await handleRawMetrics(res, parseInt(url.searchParams.get('facilityId') ?? '0', 10) || null);
     if (path === '/alertRules' && req.method === 'GET')    return await handleAlertRulesGet(res, userId);
     if (path === '/alertRulesPost' && req.method === 'POST') return await handleAlertRulesPost(req, res, userId);
     if (path === '/alertRulesDelete' && req.method === 'DELETE') {
