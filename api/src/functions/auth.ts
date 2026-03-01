@@ -147,6 +147,6 @@ app.http('auth-logout', {
 });
 
 // Export handlers for use in server.js
-export { loginHandler, logoutHandler };
+
 
 

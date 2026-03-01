@@ -191,6 +191,6 @@ app.http('users-delete', {
 });
 
 // Export handlers for use in server.js
-export { getUsersHandler, addUserHandler, deleteUserHandler };
+
 
 
