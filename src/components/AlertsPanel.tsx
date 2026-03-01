@@ -78,7 +78,11 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
     threshold: '', operator: '>', value: '', window: '60',
   });
 
-  const reload  = () => api.getAlerts().then(setAlerts).catch(console.error);
+  const reload  = () =>
+    api.getAlerts().then((data) => {
+      setAlerts(data);
+      if (data && data.length > 0) api.notifyAlerts(data).catch(() => {});
+    }).catch(console.error);
   const reloadR = () => api.getAlertRules().then(setRules).catch(console.error);
 
   useEffect(() => { reload(); }, []);

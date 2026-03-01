@@ -74,6 +74,13 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
         if (u) {
           setEmail(u.email ?? '');
           setPhoneNumber(u.phoneNumber ?? u.phone_number ?? '');
+          if (u.notifyEmail !== undefined || u.notifySms !== undefined) {
+            setNotifications(n => ({
+              ...n,
+              email: u.notifyEmail !== false,
+              sms: u.notifySms === true,
+            }));
+          }
         }
       } catch {
         // ignore
@@ -155,6 +162,21 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
     localStorage.setItem('notifEmail', String(notifications.email));
     localStorage.setItem('notifPush',  String(notifications.push));
     localStorage.setItem('notifSms',   String(notifications.sms));
+    if (userId != null && !Number.isNaN(userId)) {
+      api.updateMyNotificationPrefs(userId, { notifyEmail: notifications.email, notifySms: notifications.sms })
+        .then((updated) => {
+          try {
+            const raw = sessionStorage.getItem('user');
+            if (raw) {
+              const u = JSON.parse(raw);
+              if (updated.notifyEmail !== undefined) u.notifyEmail = updated.notifyEmail;
+              if (updated.notifySms !== undefined) u.notifySms = updated.notifySms;
+              sessionStorage.setItem('user', JSON.stringify(u));
+            }
+          } catch { /* ignore */ }
+        })
+        .catch(() => {});
+    }
     setIsEditing(false);
     if (onFacilityChange) {
       if (homeLocation === 'all') {
