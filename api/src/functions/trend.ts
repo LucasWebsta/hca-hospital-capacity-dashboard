@@ -10,15 +10,17 @@ export async function trendHandler(
     const days = parseInt(request.query.get('days') ?? '30', 10);
     const db = getDb();
 
-    // Pull actuals from the most recent N days of available data
+    // facility_metrics: group by date (metric='total'), sum metric_value
     const actuals = await db.query(
       `SELECT
-         TO_CHAR(census_date, 'Mon DD') AS date,
-         SUM(current_census)::int       AS actual
-       FROM  hospital_census
-       WHERE census_date >= (SELECT MAX(census_date) FROM hospital_census) - ($1 || ' days')::INTERVAL
-       GROUP BY census_date
-       ORDER BY census_date ASC`,
+         TO_CHAR((source_update_date AT TIME ZONE 'UTC')::date, 'Mon DD') AS date,
+         SUM(metric_value)::int AS actual
+       FROM facility_metrics
+       WHERE LOWER(metric) IN ('total census', 'total')
+         AND (source_update_date AT TIME ZONE 'UTC')::date >=
+             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - ($1 || ' days')::INTERVAL
+       GROUP BY (source_update_date AT TIME ZONE 'UTC')::date
+       ORDER BY (source_update_date AT TIME ZONE 'UTC')::date ASC`,
       [days]
     );
 

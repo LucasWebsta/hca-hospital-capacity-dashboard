@@ -463,7 +463,9 @@
                     userNameEl.textContent = `${user.firstName} ${user.lastName}`;
                 }
                 if (userInitialsEl) {
-                    const initials = (user.firstName[0] + user.lastName[0]).toUpperCase();
+                    const first = (user.firstName && String(user.firstName).trim()[0]) || '';
+                    const last = (user.lastName && String(user.lastName).trim()[0]) || '';
+                    const initials = (first + last).toUpperCase() || (user.email && user.email[0]) || '?';
                     userInitialsEl.textContent = initials;
                 }
             }

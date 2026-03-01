@@ -9,19 +9,27 @@ export async function alertsHandler(
   try {
     const db = getDb();
 
-    // Derive alerts dynamically from occupancy on the most recent census date
+    // Derive from facilities + latest facility_metrics (metric='total') occupancy
     const { rows } = await db.query(`
-      WITH latest AS (
-        SELECT MAX(census_date) AS max_date FROM hospital_census
+      WITH latest_per_facility AS (
+        SELECT facility_id, MAX(source_update_date) AS max_ts
+        FROM facility_metrics
+        WHERE LOWER(metric) IN ('total census', 'total')
+        GROUP BY facility_id
+      ),
+      latest_vals AS (
+        SELECT fm.facility_id, fm.metric_value
+        FROM facility_metrics fm
+        JOIN latest_per_facility l ON fm.facility_id = l.facility_id
+          AND fm.source_update_date = l.max_ts AND LOWER(fm.metric) IN ('total census', 'total')
       ),
       occ AS (
         SELECT
-          h.id,
-          h.name,
-          ROUND((hc.current_census::numeric / NULLIF(h.capacity, 0)) * 100, 1) AS occupancy_pct
-        FROM hospital_census hc
-        JOIN hospitals h ON hc.hospital_id = h.id
-        WHERE hc.census_date = (SELECT max_date FROM latest)
+          f.facility_id AS id,
+          f.name,
+          ROUND((COALESCE(lv.metric_value, 0)::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS occupancy_pct
+        FROM facilities f
+        LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
       )
       SELECT
         id,

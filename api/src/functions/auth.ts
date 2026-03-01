@@ -72,7 +72,8 @@ export async function loginHandler(
       ]
     );
 
-    // Return user data (without password)
+    // Return user data (without password). canAccessAdmin lets login page route Kevin to admin panel.
+    const canAccessAdmin = (user.first_name || '').toLowerCase() === 'kevin';
     return {
       status: 200,
       jsonBody: {
@@ -83,6 +84,7 @@ export async function loginHandler(
           email: user.email,
           role: user.role,
         },
+        canAccessAdmin,
       },
       headers: { 'Access-Control-Allow-Origin': '*' },
     };
@@ -137,16 +139,17 @@ export async function logoutHandler(
 app.http('auth-login', {
   methods: ['POST', 'OPTIONS'],
   authLevel: 'anonymous',
+  route: 'auth/login',
   handler: loginHandler,
 });
 
 app.http('auth-logout', {
   methods: ['POST', 'OPTIONS'],
   authLevel: 'anonymous',
+  route: 'auth/logout',
   handler: logoutHandler,
 });
 
 // Export handlers for use in server.js
 export { loginHandler, logoutHandler };
-
 
