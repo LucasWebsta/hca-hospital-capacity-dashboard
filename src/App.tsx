@@ -8,6 +8,7 @@ import {
   ForecastOccupancyChart,
   FacilitiesAtRisk,
   AlertsPanel,
+  ReportsPanel,
 } from "./components";
 import ForecastPage from "./components/ForecastPage";
 import { api } from "./api";
@@ -61,7 +62,7 @@ function App() {
         overflow: "hidden",
       }}
     >
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} facilityName={selectedFacilityName} />
 
       <div
         style={{
@@ -79,6 +80,8 @@ function App() {
             setSelectedFacilityId(id);
             setSelectedFacilityName(name);
           }}
+          selectedFacilityId={selectedFacilityId}
+          selectedFacilityName={selectedFacilityName}
         />
 
         {activeTab === "dashboard" && (
@@ -277,28 +280,20 @@ function App() {
           </div>
         )}
 
+        {activeTab === "reports" && (
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }} className="reports-print-container">
+            <ReportsPanel />
+          </div>
+        )}
+
         {activeTab !== "dashboard" &&
           activeTab !== "alerts" &&
+          activeTab !== "reports" &&
           activeTab !== "forecast" && (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <div style={{ textAlign: "center" }}>
-                <h3
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: "#111827",
-                    marginBottom: 8,
-                  }}
-                >
+                <h3 style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginBottom: 8 }}>
                   {activeTab === "settings" && "Settings"}
-                  {activeTab === "reports" && "Reports"}
                 </h3>
                 <p style={{ color: "#6b7280" }}>Coming soon...</p>
               </div>

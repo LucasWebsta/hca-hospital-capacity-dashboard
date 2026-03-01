@@ -135,9 +135,12 @@
                 body: JSON.stringify({ email, password })
             })
             .then(async response => {
-                const data = await response.json();
+                const text = await response.text();
+                let data = {};
+                if (text && text.trim()) {
+                    try { data = JSON.parse(text); } catch (e) { throw new Error('Invalid server response'); }
+                }
                 if (response.status === 401) {
-                    // Wrong credentials — show inline field errors only, no alert
                     showLoginError();
                     return;
                 }

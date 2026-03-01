@@ -7,6 +7,7 @@ const BRAND_ORANGE = '#E75925';
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  facilityName?: string;
 }
 
 const navItems = [
@@ -16,7 +17,7 @@ const navItems = [
   { id: 'reports', label: 'Reports', icon: FileText },
 ];
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, facilityName }: SidebarProps) {
   return (
     <div style={{
       width: 224, minWidth: 224,
@@ -76,20 +77,26 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
       <div style={{ padding: '10px 12px 20px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         {/* Logged-in user */}
         {(() => {
-          let user: { firstName?: string; lastName?: string; role?: string } | null = null;
+          let user: { firstName?: string; lastName?: string; role?: string; photoUrl?: string } | null = null;
           try { const raw = sessionStorage.getItem('user'); user = raw ? JSON.parse(raw) : null; } catch {}
           const initials = user ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() : 'HCA';
           const fullName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : 'HCA Healthcare';
           const role = user?.role ?? '';
+          const photoUrl = user?.photoUrl;
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, marginBottom: 2 }}>
               <div style={{
                 width: 32, height: 32, borderRadius: '50%',
-                background: BRAND_ORANGE,
+                background: BRAND_ORANGE, overflow: 'hidden',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
                 boxShadow: `0 1px 6px rgba(231,89,37,0.45)`,
-              }}>{initials}</div>
+              }}>
+                {photoUrl
+                  ? <img src={photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : initials
+                }
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
                 <div style={{ fontSize: 10.5, color: '#7a9abd' }}>{role}</div>
@@ -99,7 +106,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           );
         })()}
 
-        {/* Emin Rantsra */}
+        {/* Home Hospital */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8 }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
@@ -109,12 +116,9 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a9abd" strokeWidth="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Emin Rantsra</div>
-            <div style={{ fontSize: 10.5, color: '#7a9abd' }}>Hospital</div>
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{facilityName ?? 'All Facilities'}</div>
+            <div style={{ fontSize: 10.5, color: '#7a9abd' }}>Home Hospital</div>
           </div>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7a9abd', padding: 2 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-          </button>
         </div>
       </div>
     </div>

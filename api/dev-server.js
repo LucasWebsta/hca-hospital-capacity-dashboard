@@ -53,7 +53,7 @@ const server = http.createServer(async (req, res) => {
   const query = parseQuery(url);
 
   if (method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' });
     res.end();
     return;
   }
@@ -63,32 +63,43 @@ const server = http.createServer(async (req, res) => {
 
     // POST /api/auth/login
     if (base === 'auth/login' && method === 'POST') {
-      const raw = await readBody(req);
-      const body = JSON.parse(raw || '{}');
-      const { email, password } = body;
-      if (!email || !password) return send(res, 400, { error: 'Email and password are required' });
-      const { rows } = await db.query(
-        `SELECT id, first_name, last_name, email, role, status, password_hash FROM users WHERE email = $1 AND status = 'Active'`,
-        [email.toLowerCase()]
-      );
-      if (rows.length === 0) {
-        await db.query(`INSERT INTO activity_logs (user_name, action, ip_address) VALUES ($1, 'signin', $2)`, [email, req.headers['x-forwarded-for'] || 'unknown']);
-        return send(res, 401, { error: 'Invalid email or password' });
+      try {
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const { email, password } = body;
+        if (!email || !password) return send(res, 400, { error: 'Email and password are required' });
+        const { rows } = await db.query(
+          `SELECT id, first_name, last_name, email, role, password_hash FROM users WHERE email = $1`,
+          [email.toLowerCase()]
+        );
+        if (rows.length === 0) {
+          try {
+            await db.query(`INSERT INTO activity_logs (user_name, action, ip_address) VALUES ($1, 'signin', $2)`, [email, req.headers['x-forwarded-for'] || 'unknown']);
+          } catch (_) { /* table may not exist */ }
+          return send(res, 401, { error: 'Invalid email or password' });
+        }
+        const user = rows[0];
+        if (user.password_hash !== password) {
+          try {
+            await db.query(`INSERT INTO activity_logs (user_name, action, ip_address) VALUES ($1, 'signin', $2)`, [email, req.headers['x-forwarded-for'] || 'unknown']);
+          } catch (_) { /* table may not exist */ }
+          return send(res, 401, { error: 'Invalid email or password' });
+        }
+        try {
+          await db.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent) VALUES ($1, $2, 'signin', $3, $4)`,
+            [user.id, `${user.first_name} ${user.last_name}`, req.headers['x-forwarded-for'] || 'unknown', req.headers['user-agent'] || 'unknown']
+          );
+        } catch (_) { /* table may not exist or different schema */ }
+        const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role || '');
+        return send(res, 200, {
+          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role },
+          canAccessAdmin,
+        });
+      } catch (err) {
+        console.error('auth/login error:', err);
+        return send(res, 500, { error: err.message || 'Internal server error' });
       }
-      const user = rows[0];
-      if (user.password_hash !== password) {
-        await db.query(`INSERT INTO activity_logs (user_name, action, ip_address) VALUES ($1, 'signin', $2)`, [email, req.headers['x-forwarded-for'] || 'unknown']);
-        return send(res, 401, { error: 'Invalid email or password' });
-      }
-      await db.query(
-        `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent) VALUES ($1, $2, 'signin', $3, $4)`,
-        [user.id, `${user.first_name} ${user.last_name}`, req.headers['x-forwarded-for'] || 'unknown', req.headers['user-agent'] || 'unknown']
-      );
-      const canAccessAdmin = (user.first_name || '').toLowerCase() === 'kevin';
-      return send(res, 200, {
-        user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role },
-        canAccessAdmin,
-      });
     }
 
     // POST /api/auth/logout
@@ -124,8 +135,8 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/users
     if (base === 'users' && method === 'GET') {
-      const { rows } = await db.query('SELECT id, first_name, last_name, email, role, status, created_at FROM users ORDER BY created_at DESC');
-      const users = (rows || []).map((r) => ({ id: r.id, firstName: r.first_name, lastName: r.last_name, email: r.email, role: r.role, status: r.status, createdAt: r.created_at }));
+      const { rows } = await db.query('SELECT id, first_name, last_name, email, role, created_at FROM users ORDER BY created_at DESC');
+      const users = (rows || []).map((r) => ({ id: r.id, firstName: r.first_name, lastName: r.last_name, email: r.email, role: r.role, status: r.status || 'Active', createdAt: r.created_at }));
       return send(res, 200, users);
     }
 
@@ -138,12 +149,12 @@ const server = http.createServer(async (req, res) => {
       const existing = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
       if (existing.rows.length > 0) return send(res, 409, { error: 'User with this email already exists' });
       const { rows } = await db.query(
-        `INSERT INTO users (first_name, last_name, email, password_hash, role, status) VALUES ($1, $2, $3, $4, $5, 'Active') RETURNING id, first_name, last_name, email, role, status`,
+        `INSERT INTO users (first_name, last_name, email, password_hash, role) VALUES ($1, $2, $3, $4, $5) RETURNING id, first_name, last_name, email, role, created_at`,
         [firstName, lastName, email.toLowerCase(), password, role]
       );
       const u = rows[0];
       await db.query(`INSERT INTO activity_logs (user_id, user_name, action) VALUES ($1, $2, 'user_added')`, [u.id, `${firstName} ${lastName}`]);
-      return send(res, 201, { id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, role: u.role, status: u.status });
+      return send(res, 201, { id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, role: u.role, status: 'Active' });
     }
 
     // DELETE /api/users/:id
@@ -158,16 +169,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { message: 'User deleted successfully' });
     }
 
-    // GET /api/census (facilities + facility_metrics; total from 'total'/'census'/etc. + ICU)
+    // GET /api/census (optional ?facility_id= for single facility)
     if (base === 'census' && method === 'GET') {
-      const { rows } = await db.query(`
-        WITH census_metrics AS (
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const { rows } = await db.query(
+        `WITH census_metrics AS (
           SELECT facility_id, source_update_date, metric_value,
                  ROW_NUMBER() OVER (PARTITION BY facility_id ORDER BY source_update_date DESC,
                    CASE WHEN LOWER(metric) = 'total census' THEN 0 WHEN LOWER(metric) = 'total' THEN 1 WHEN LOWER(metric) = 'census' THEN 2 ELSE 3 END
                  ) AS rn
           FROM facility_metrics
           WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+            AND ($1::int IS NULL OR facility_id = $1)
         ),
         latest_vals AS (
           SELECT facility_id, metric_value FROM census_metrics WHERE rn = 1
@@ -175,9 +188,10 @@ const server = http.createServer(async (req, res) => {
         totals AS (
           SELECT COALESCE(SUM(lv.metric_value), 0)::int AS total_census, COALESCE(SUM(f.capacity), 0)::int AS total_capacity
           FROM facilities f LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
+          WHERE ($1::int IS NULL OR f.facility_id = $1)
         ),
         latest_icu AS (
-          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) = 'icu' GROUP BY facility_id
+          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) = 'icu' AND ($1::int IS NULL OR facility_id = $1) GROUP BY facility_id
         ),
         icu_vals AS (
           SELECT fm.facility_id, fm.metric_value FROM facility_metrics fm
@@ -188,7 +202,8 @@ const server = http.createServer(async (req, res) => {
           SELECT ROUND(AVG(daily_total))::int AS avg_census FROM (
             SELECT SUM(metric_value)::int AS daily_total FROM facility_metrics
             WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-              AND (source_update_date AT TIME ZONE 'UTC')::date >= (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')) - INTERVAL '7 days'
+              AND ($1::int IS NULL OR facility_id = $1)
+              AND (source_update_date AT TIME ZONE 'UTC')::date >= (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '7 days'
             GROUP BY (source_update_date AT TIME ZONE 'UTC')::date
           ) d
         )
@@ -196,16 +211,18 @@ const server = http.createServer(async (req, res) => {
                ROUND((t.total_census::numeric / NULLIF(t.total_capacity, 0)) * 100, 1) AS "occupancyRate",
                (SELECT COALESCE(ROUND(avg_census * 1.015)::int, t.total_census) FROM recent_avg) AS "sevenDayForecast",
                (SELECT total FROM icu_total) AS "icuTotal"
-        FROM totals t
-      `);
+        FROM totals t`,
+        [facilityId]
+      );
       return send(res, 200, rows[0]);
     }
 
-    // GET /api/facilities (facilities + facility_metrics)
+    // GET /api/facilities (optional ?facility_id= for single facility)
     if (base === 'facilities' && method === 'GET') {
-      const { rows } = await db.query(`
-        WITH latest_per_facility AS (
-          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') GROUP BY facility_id
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const { rows } = await db.query(
+        `WITH latest_per_facility AS (
+          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1) GROUP BY facility_id
         ),
         latest_vals AS (
           SELECT fm.facility_id, fm.metric_value FROM facility_metrics fm
@@ -213,7 +230,7 @@ const server = http.createServer(async (req, res) => {
         ),
         ranked AS (
           SELECT facility_id, metric_value, ROW_NUMBER() OVER (PARTITION BY facility_id ORDER BY source_update_date DESC) AS rn
-          FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
+          FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)
         ),
         prev_vals AS (SELECT facility_id, metric_value AS prev_val FROM ranked WHERE rn = 2)
         SELECT f.name, COALESCE(lv.metric_value, 0)::int AS census,
@@ -223,8 +240,10 @@ const server = http.createServer(async (req, res) => {
                     WHEN COALESCE(lv.metric_value, 0) < COALESCE(pv.prev_val, lv.metric_value, 0) THEN 'down' ELSE 'flat' END AS trend
         FROM facilities f LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
         LEFT JOIN prev_vals pv ON f.facility_id = pv.facility_id
-        ORDER BY occupancy DESC NULLS LAST LIMIT 5
-      `);
+        WHERE ($1::int IS NULL OR f.facility_id = $1)
+        ORDER BY occupancy DESC NULLS LAST LIMIT 5`,
+        [facilityId]
+      );
       return send(res, 200, rows);
     }
 
@@ -268,16 +287,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, rows);
     }
 
-    // GET /api/trend (facility_metrics by date)
+    // GET /api/trend (optional ?facility_id= for single facility)
     if (base === 'trend' && method === 'GET') {
       const days = parseInt(query.get('days') || '30', 10);
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
       const actuals = await db.query(
         `SELECT TO_CHAR((source_update_date AT TIME ZONE 'UTC')::date, 'Mon DD') AS date, SUM(metric_value)::int AS actual
          FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
+         AND ($2::int IS NULL OR facility_id = $2)
          AND (source_update_date AT TIME ZONE 'UTC')::date >=
-             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - ($1 || ' days')::INTERVAL
+             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($2::int IS NULL OR facility_id = $2)) - ($1 || ' days')::INTERVAL
          GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY (source_update_date AT TIME ZONE 'UTC')::date ASC`,
-        [days]
+        [days, facilityId]
       );
       const historicalRows = actuals.rows || [];
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -301,16 +322,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, historicalRows);
     }
 
-    // GET /api/forecast (facility_metrics)
+    // GET /api/forecast (optional ?facility_id= for single facility)
     if (base === 'forecast' && method === 'GET') {
       const days = parseInt(query.get('days') || '7', 10);
-      const { rows: recent } = await db.query(`
-        SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const { rows: recent } = await db.query(
+        `SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
         FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
+        AND ($1::int IS NULL OR facility_id = $1)
         AND (source_update_date AT TIME ZONE 'UTC')::date >=
-            (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - INTERVAL '14 days'
-        GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY census_date ASC
-      `);
+            (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '14 days'
+        GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY census_date ASC`,
+        [facilityId]
+      );
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const forecastRows = [];
       if (recent && recent.length >= 2) {
@@ -331,14 +355,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { data: forecastRows, stats: { mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 } });
     }
 
-    // GET /api/alertRules (facility_id; returns [] if table missing)
+    // GET /api/alertRules — only rules for the current user (X-User-Id header)
     if (base === 'alertRules' && method === 'GET') {
       try {
-        const { rows } = await db.query(`
-          SELECT ar.id, ar.facility_id AS hospital_id, f.name AS facility_name, ar.metric, ar.condition_type,
+        const userId = req.headers['x-user-id'];
+        if (!userId) return send(res, 200, []);
+        const { rows } = await db.query(
+          `SELECT ar.id, ar.facility_id AS hospital_id, f.name AS facility_name, ar.metric, ar.condition_type,
                  ar.threshold_pct, ar.operator, ar.value_number, ar.window_minutes, ar.created_at
-          FROM alert_rules ar JOIN facilities f ON f.facility_id = ar.facility_id ORDER BY ar.created_at DESC
-        `);
+           FROM alert_rules ar JOIN facilities f ON f.facility_id = ar.facility_id
+           WHERE ar.user_id = $1 ORDER BY ar.created_at DESC`,
+          [userId]
+        );
         return send(res, 200, rows || []);
       } catch (e) {
         if (e.code === '42P01') return send(res, 200, []);
@@ -346,8 +374,10 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
-    // POST /api/alertRulesPost (store as facility_id)
+    // POST /api/alertRulesPost — create rule for current user (X-User-Id required)
     if (base === 'alertRulesPost' && method === 'POST') {
+      const userId = req.headers['x-user-id'];
+      if (!userId) return send(res, 401, { error: 'Login required to create alert rules' });
       const raw = await readBody(req);
       const body = JSON.parse(raw || '{}');
       const { hospital_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes } = body;
@@ -355,20 +385,61 @@ const server = http.createServer(async (req, res) => {
         return send(res, 400, { error: 'hospital_id, metric, condition_type required' });
       }
       const { rows } = await db.query(
-        `INSERT INTO alert_rules (facility_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO alert_rules (user_id, facility_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING id, facility_id AS hospital_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes, created_at`,
-        [hospital_id, metric, condition_type, threshold_pct ?? null, operator ?? null, value_number ?? null, window_minutes ?? null]
+        [userId, hospital_id, metric, condition_type, threshold_pct ?? null, operator ?? null, value_number ?? null, window_minutes ?? null]
       );
       return send(res, 201, rows[0]);
     }
 
-    // DELETE /api/alertRulesDelete
+    // GET /api/reportSnapshots/:id — load a saved report snapshot (no auth required for viewing)
+    if (base.startsWith('reportSnapshots/') && method === 'GET') {
+      const id = base.slice('reportSnapshots/'.length);
+      if (!id) return send(res, 400, { error: 'Snapshot id required' });
+      try {
+        const { rows } = await db.query(
+          'SELECT id, title, config, data, created_at FROM report_snapshots WHERE id = $1',
+          [id]
+        );
+        if (rows.length === 0) return send(res, 404, { error: 'Snapshot not found' });
+        const r = rows[0];
+        return send(res, 200, { id: r.id, title: r.title, config: r.config, data: r.data, created_at: r.created_at });
+      } catch (e) {
+        if (e.code === '42P01') return send(res, 404, { error: 'Snapshot not found' });
+        throw e;
+      }
+    }
+
+    // POST /api/reportSnapshots — save a report snapshot (X-User-Id optional but recommended)
+    if (base === 'reportSnapshots' && method === 'POST') {
+      const userId = req.headers['x-user-id'] || null;
+      try {
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const { title, config, data } = body;
+        if (!config || !data) return send(res, 400, { error: 'config and data are required' });
+        const id = require('crypto').randomBytes(12).toString('base64url');
+        await db.query(
+          'INSERT INTO report_snapshots (id, user_id, title, config, data) VALUES ($1, $2, $3, $4, $5)',
+          [id, userId, title || null, JSON.stringify(config), JSON.stringify(data)]
+        );
+        return send(res, 201, { id, created_at: new Date().toISOString() });
+      } catch (e) {
+        if (e.code === '42P01') return send(res, 500, { error: 'Report snapshots not available. Run db/schema-report-snapshots.sql.' });
+        throw e;
+      }
+    }
+
+    // DELETE /api/alertRulesDelete — only delete rules owned by current user
     if (base === 'alertRulesDelete' && method === 'DELETE') {
       const id = query.get('id');
+      const userId = req.headers['x-user-id'];
       if (!id) return send(res, 400, { error: 'id required' });
+      if (!userId) return send(res, 401, { error: 'Login required to delete alert rules' });
       try {
-        await db.query('DELETE FROM alert_rules WHERE id = $1', [id]);
+        const { rowCount } = await db.query('DELETE FROM alert_rules WHERE id = $1 AND user_id = $2', [id, userId]);
+        if (rowCount === 0) return send(res, 404, { error: 'Alert rule not found or you do not own it' });
       } catch (e) {
         if (e.code === '42P01') return send(res, 204, null);
         throw e;

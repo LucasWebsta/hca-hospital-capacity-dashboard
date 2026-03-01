@@ -9,7 +9,7 @@ export async function getUsersHandler(
   try {
     const db = getDb();
     const { rows } = await db.query(
-      `SELECT id, first_name, last_name, email, role, status, created_at
+      `SELECT id, first_name, last_name, email, role, created_at
        FROM users
        ORDER BY created_at DESC`
     );
@@ -20,7 +20,7 @@ export async function getUsersHandler(
       lastName: row.last_name,
       email: row.email,
       role: row.role,
-      status: row.status,
+      status: (row as { status?: string }).status || 'Active',
       createdAt: row.created_at,
     }));
 
@@ -75,11 +75,11 @@ export async function addUserHandler(
       };
     }
 
-    // Insert new user
+    // Insert new user (omit status if column does not exist)
     const { rows } = await db.query(
-      `INSERT INTO users (first_name, last_name, email, password_hash, role, status)
-       VALUES ($1, $2, $3, $4, $5, 'Active')
-       RETURNING id, first_name, last_name, email, role, status`,
+      `INSERT INTO users (first_name, last_name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, first_name, last_name, email, role, created_at`,
       [firstName, lastName, email.toLowerCase(), password, role]
     );
 
@@ -100,7 +100,7 @@ export async function addUserHandler(
         lastName: newUser.last_name,
         email: newUser.email,
         role: newUser.role,
-        status: newUser.status,
+        status: 'Active',
       },
       headers: { 'Access-Control-Allow-Origin': '*' },
     };
@@ -189,8 +189,3 @@ app.http('users-delete', {
   route: 'users/{id?}',
   handler: deleteUserHandler,
 });
-
-// Export handlers for use in server.js
-
-
-

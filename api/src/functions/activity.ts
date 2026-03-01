@@ -56,6 +56,3 @@ app.http('activity', {
   handler: getActivityLogsHandler,
 });
 
-// Export handler for use in server.js
-
-
