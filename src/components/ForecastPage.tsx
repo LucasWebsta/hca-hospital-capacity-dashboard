@@ -10,10 +10,10 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { loadFacilities, loadMetrics } from "../utils/loadData.ts";
-import type { Facility, MetricRow } from "../utils/loadData.ts";
-
-import { forecastMetric } from "../utils/forecast.ts";
+import { forecastMetric, validateModel } from "../utils/forecast";
+import type { ValidationMetrics } from "../utils/forecast";
+import { loadFacilities, loadMetrics } from "../utils/loadData";
+import type { Facility, MetricRow } from "../utils/loadData";
 
 const METRICS = ["Admissions", "Discharges", "ICU Occupancy", "Total Census"];
 
@@ -24,17 +24,41 @@ export default function ForecastPage() {
   const [selectedMetric, setSelectedMetric] = useState("Admissions");
   const [hoursAhead, setHoursAhead] = useState(24);
   const [loading, setLoading] = useState(true);
+  const [validation, setValidation] = useState<ValidationMetrics | null>(null);
 
   useEffect(() => {
     async function load() {
-      const [f, m] = await Promise.all([loadFacilities(), loadMetrics()]);
+      const f = await loadFacilities();
       setFacilities(f);
-      setMetrics(m);
-      setSelectedFacility(f[0]?.facilityId ?? null);
+      const firstId = f[0]?.facilityId ?? null;
+      setSelectedFacility(firstId);
+      if (firstId) {
+        const m = await loadMetrics(firstId);
+        setMetrics(m);
+      }
       setLoading(false);
     }
     load();
   }, []);
+
+  useEffect(() => {
+    async function reload() {
+      if (selectedFacility !== null) {
+        setLoading(true);
+        const m = await loadMetrics(selectedFacility);
+        setMetrics(m);
+        setLoading(false);
+      }
+    }
+    reload();
+  }, [selectedFacility]);
+
+  function getLatestValue(metric: string, orgId: number): number {
+    const filtered = metrics
+      .filter((r) => r.orgId === orgId && r.metric === metric)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    return filtered[0]?.value ?? 0;
+  }
 
   const facility = facilities.find((f) => f.facilityId === selectedFacility);
 
@@ -74,13 +98,6 @@ export default function ForecastPage() {
   const peakForecast = forecastData.filter((p) => p.isForecast);
   const peakValue =
     peakForecast.length > 0 ? Math.max(...peakForecast.map((p) => p.value)) : 0;
-
-  function getLatestValue(metric: string, orgId: number): number {
-    const filtered = metrics
-      .filter((r) => r.orgId === orgId && r.metric === metric)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-    return filtered[0]?.value ?? 0;
-  }
 
   if (loading) {
     return (
@@ -125,7 +142,7 @@ export default function ForecastPage() {
             fontWeight: 500,
           }}
         >
-          Predictive occupancy modeling · Linear regression
+          Predictive occupancy modeling · Trend-seasonal hybrid model
         </div>
       </div>
 
@@ -308,6 +325,48 @@ export default function ForecastPage() {
         </div>
       )}
 
+      {/* Validation metrics */}
+      {validation && (
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 12,
+            border: "1px solid #edf0f5",
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            gap: 32,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              MODEL VALIDATION
+            </div>
+            <div style={{ fontSize: 12, color: "#0f172a", marginTop: 4 }}>
+              80/20 train/test split · {validation.trainSize} train points ·{" "}
+              {validation.testSize} test points
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              MAE
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
+              {validation.mae}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              RMSE
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
+              {validation.rmse}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Forecast Chart */}
       <div
         style={{
@@ -329,7 +388,7 @@ export default function ForecastPage() {
           {selectedMetric} — Actual + {hoursAhead}h Forecast
         </div>
         <div style={{ fontSize: 11.5, color: "#94a3b8", marginBottom: 16 }}>
-          {facility?.location} · Linear regression model
+          {facility?.location} · Trend-seasonal hybrid model
         </div>
         <ResponsiveContainer width="100%" height={320}>
           <LineChart data={chartData}>

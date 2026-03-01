@@ -6,6 +6,67 @@ export interface ForecastPoint {
     isForecast: boolean;
 }
 
+export interface ValidationMetrics {
+    mae: number;
+    rmse: number;
+    trainSize: number;
+    testSize: number;
+}
+
+export function validateModel(
+    rows: MetricRow[],
+    orgId: number,
+    metric: string
+): ValidationMetrics {
+    const filtered = rows
+        .filter(r => r.orgId === orgId && r.metric === metric)
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    if (filtered.length < 10) return { mae: 0, rmse: 0, trainSize: 0, testSize: 0 };
+
+    const splitIndex = Math.floor(filtered.length * 0.8);
+    const trainData = filtered.slice(0, splitIndex);
+    const testData = filtered.slice(splitIndex);
+
+    const base = trainData[0].timestamp.getTime();
+    const points = trainData.map(r => ({
+        x: (r.timestamp.getTime() - base) / (1000 * 60 * 15),
+        y: r.value,
+    }));
+    const n = points.length;
+    const sumX = points.reduce((a, p) => a + p.x, 0);
+    const sumY = points.reduce((a, p) => a + p.y, 0);
+    const sumXY = points.reduce((a, p) => a + p.x * p.y, 0);
+    const sumX2 = points.reduce((a, p) => a + p.x * p.x, 0);
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+
+    const lastTrainTime = trainData[trainData.length - 1].timestamp.getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const oneDayAgo = lastTrainTime - oneDayMs;
+    const recentTrain = trainData.filter(r => r.timestamp.getTime() >= oneDayAgo);
+    const seasonalSource = recentTrain.length > 10 ? recentTrain : trainData.slice(-96);
+
+    const errors: number[] = [];
+    testData.forEach((actual, i) => {
+        const futureMinuteOfDay = new Date(actual.timestamp).getHours() * 60 + new Date(actual.timestamp).getMinutes();
+        const closest = seasonalSource.reduce((prev, curr) => {
+            const currMinute = new Date(curr.timestamp).getHours() * 60 + new Date(curr.timestamp).getMinutes();
+            const prevMinute = new Date(prev.timestamp).getHours() * 60 + new Date(prev.timestamp).getMinutes();
+            return Math.abs(currMinute - futureMinuteOfDay) < Math.abs(prevMinute - futureMinuteOfDay)
+                ? curr : prev;
+        });
+
+        const trendAdjustment = slope * (splitIndex + i);
+        const predicted = Math.max(0, closest.value + trendAdjustment);
+        errors.push(Math.abs(predicted - actual.value));
+    });
+
+    const mae = Math.round((errors.reduce((a, e) => a + e, 0) / errors.length) * 10) / 10;
+    const rmse = Math.round(Math.sqrt(errors.reduce((a, e) => a + e * e, 0) / errors.length) * 10) / 10;
+
+    return { mae, rmse, trainSize: trainData.length, testSize: testData.length };
+}
+
 export function forecastMetric(
     rows: MetricRow[],
     orgId: number,
@@ -24,7 +85,6 @@ export function forecastMetric(
         isForecast: false,
     }));
 
-    // Calculate linear trend
     const base = filtered[0].timestamp.getTime();
     const points = filtered.map(r => ({
         x: (r.timestamp.getTime() - base) / (1000 * 60 * 15),
@@ -40,20 +100,15 @@ export function forecastMetric(
     const lastTime = filtered[filtered.length - 1].timestamp.getTime();
     const stepsAhead = (hoursAhead * 60) / 15;
     const oneDayMs = 24 * 60 * 60 * 1000;
-    const sevenDaysMs = 7 * oneDayMs;
 
-    // Only use last 7 days for seasonal pattern
-const oneDayAgo = lastTime - oneDayMs;
-const recentData = filtered.filter(r => r.timestamp.getTime() >= oneDayAgo);
-const seasonalSource = recentData.length > 10 ? recentData : filtered.slice(-96);
+    const oneDayAgo = lastTime - oneDayMs;
+    const recentData = filtered.filter(r => r.timestamp.getTime() >= oneDayAgo);
+    const seasonalSource = recentData.length > 10 ? recentData : filtered.slice(-96);
 
     const forecast: ForecastPoint[] = [];
     for (let i = 1; i <= stepsAhead; i++) {
         const futureTime = lastTime + i * 15 * 60 * 1000;
-
-        // Get seasonal value by matching time of day from last 7 days
-        const futureDate = new Date(futureTime);
-        const futureMinuteOfDay = futureDate.getHours() * 60 + futureDate.getMinutes();
+        const futureMinuteOfDay = new Date(futureTime).getHours() * 60 + new Date(futureTime).getMinutes();
         const closest = seasonalSource.reduce((prev, curr) => {
             const currMinute = new Date(curr.timestamp).getHours() * 60 + new Date(curr.timestamp).getMinutes();
             const prevMinute = new Date(prev.timestamp).getHours() * 60 + new Date(prev.timestamp).getMinutes();
@@ -61,7 +116,6 @@ const seasonalSource = recentData.length > 10 ? recentData : filtered.slice(-96)
                 ? curr : prev;
         });
 
-        // Apply trend adjustment on top of seasonal value
         const trendAdjustment = slope * i;
         const forecastValue = Math.max(0, Math.round(closest.value + trendAdjustment));
 
