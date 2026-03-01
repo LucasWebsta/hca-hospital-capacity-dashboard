@@ -11,15 +11,16 @@ type Series = 'Overall' | 'ICU' | 'Emergency';
 
 interface OccupancyTrendChartProps {
   days?: number;
+  facilityId?: number;
 }
 
-export function OccupancyTrendChart({ days = 30 }: OccupancyTrendChartProps) {
+export function OccupancyTrendChart({ days = 30, facilityId }: OccupancyTrendChartProps) {
   const [activeSeries, setActiveSeries] = useState<Series>('Overall');
   const [data, setData] = useState<TrendPoint[]>([]);
 
   useEffect(() => {
-    api.getTrend(days).then(setData).catch(console.error);
-  }, [days]);
+    api.getTrend(days, facilityId).then(setData).catch(console.error);
+  }, [days, facilityId]);
 
   const firstActual = data.find(d => d.actual != null);
   const lastActual = [...data].reverse().find(d => d.actual != null);

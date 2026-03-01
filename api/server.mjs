@@ -34,7 +34,22 @@ function json(res, data, status = 200) {
 }
 
 // ── /api/census ──────────────────────────────────────────────────────────────
-async function handleCensus(res) {
+async function handleCensus(res, facilityId = null) {
+  if (facilityId) {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT ON (fm.facility_id)
+        fm.metric_value::int AS "totalCensus",
+        f.capacity::int      AS "totalCapacity",
+        ROUND((fm.metric_value::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS "occupancyRate",
+        ROUND(fm.metric_value * 1.015)::int AS "sevenDayForecast"
+      FROM facility_metrics fm
+      JOIN facilities f ON f.facility_id = fm.facility_id
+      WHERE fm.facility_id = $1
+        AND LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+      ORDER BY fm.facility_id, fm.source_update_date DESC
+    `, [facilityId]);
+    return json(res, rows[0] ?? {});
+  }
   const { rows } = await pool.query(`
     WITH latest_per_facility AS (
       SELECT DISTINCT ON (fm.facility_id)
@@ -70,8 +85,14 @@ async function handleCensus(res) {
   json(res, rows[0] ?? {});
 }
 
+// ── /api/facilitiesList ───────────────────────────────────────────────────────
+async function handleFacilitiesList(res) {
+  const { rows } = await pool.query(`SELECT facility_id AS id, name FROM facilities ORDER BY name`);
+  json(res, rows);
+}
+
 // ── /api/facilities ───────────────────────────────────────────────────────────
-async function handleFacilities(res) {
+async function handleFacilities(res, facilityId = null) {
   const { rows } = await pool.query(`
     WITH latest AS (
       SELECT DISTINCT ON (fm.facility_id)
@@ -102,8 +123,9 @@ async function handleFacilities(res) {
     FROM facilities f
     JOIN latest l ON l.facility_id = f.facility_id
     LEFT JOIN day_ago d ON d.facility_id = f.facility_id
+    WHERE ($1::int IS NULL OR f.facility_id = $1)
     ORDER BY occupancy DESC
-  `);
+  `, [facilityId]);
   json(res, rows);
 }
 
@@ -148,8 +170,34 @@ async function handleAlerts(res) {
 }
 
 // ── /api/trend ────────────────────────────────────────────────────────────────
-async function handleTrend(res, days = 30) {
-  // Daily Total Census summed across all facilities, expressed as occupancy %
+async function handleTrend(res, days = 30, facilityId = null) {
+  if (facilityId) {
+    const { rows } = await pool.query(`
+      WITH daily AS (
+        SELECT
+          DATE(source_update_date)  AS d,
+          AVG(fm.metric_value)::int AS total_census,
+          MAX(f.capacity)           AS capacity
+        FROM facility_metrics fm
+        JOIN facilities f ON f.facility_id = fm.facility_id
+        WHERE fm.facility_id = $2
+          AND LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          AND fm.source_update_date >= (
+            SELECT MAX(source_update_date) FROM facility_metrics
+            WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          ) - ($1 || ' days')::INTERVAL
+        GROUP BY DATE(source_update_date)
+      )
+      SELECT
+        TO_CHAR(d, 'Mon DD') AS date,
+        total_census         AS actual,
+        ROUND((total_census::numeric / NULLIF(capacity, 0)) * 100, 1)::float AS occupancy_pct
+      FROM daily
+      ORDER BY d ASC
+    `, [days, facilityId]);
+    return json(res, rows);
+  }
+  // All facilities
   const { rows } = await pool.query(`
     WITH daily AS (
       SELECT
@@ -287,19 +335,50 @@ function handleLogout(res) {
 }
 
 // ── /api/forecast ─────────────────────────────────────────────────────────────
-async function handleForecast(res, days = 7) {
-  const { rows } = await pool.query(`
-    SELECT
-      TO_CHAR(forecast_date, 'Mon DD') AS date,
-      predicted_census                 AS predicted,
-      confidence_lower                 AS lower,
-      confidence_upper                 AS upper
-    FROM forecast_data
-    WHERE hospital_id IS NULL
-      AND forecast_date >= CURRENT_DATE
-      AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
-    ORDER BY forecast_date ASC
-  `, [days]);
+async function handleForecast(res, days = 7, facilityId = null) {
+  let rows;
+  if (facilityId) {
+    // Try facility-specific forecast first, fall back to system-wide
+    ({ rows } = await pool.query(`
+      SELECT
+        TO_CHAR(forecast_date, 'Mon DD') AS date,
+        predicted_census                 AS predicted,
+        confidence_lower                 AS lower,
+        confidence_upper                 AS upper
+      FROM forecast_data
+      WHERE hospital_id = $2
+        AND forecast_date >= CURRENT_DATE
+        AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
+      ORDER BY forecast_date ASC
+    `, [days, facilityId]));
+    if (rows.length === 0) {
+      ({ rows } = await pool.query(`
+        SELECT
+          TO_CHAR(forecast_date, 'Mon DD') AS date,
+          predicted_census                 AS predicted,
+          confidence_lower                 AS lower,
+          confidence_upper                 AS upper
+        FROM forecast_data
+        WHERE hospital_id IS NULL
+          AND forecast_date >= CURRENT_DATE
+          AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
+        ORDER BY forecast_date ASC
+      `, [days]));
+    }
+  } else {
+    ({ rows } = await pool.query(`
+      SELECT
+        TO_CHAR(forecast_date, 'Mon DD') AS date,
+        predicted_census                 AS predicted,
+        confidence_lower                 AS lower,
+        confidence_upper                 AS upper
+      FROM forecast_data
+      WHERE hospital_id IS NULL
+        AND forecast_date >= CURRENT_DATE
+        AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
+      ORDER BY forecast_date ASC
+    `, [days]));
+  }
 
   json(res, { data: rows, stats: { mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 } });
 }
@@ -315,6 +394,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname.replace(/^\/api/, '');
   const days = parseInt(url.searchParams.get('days') ?? '30', 10);
+  const facilityId = url.searchParams.get('facility_id') ? parseInt(url.searchParams.get('facility_id'), 10) : null;
 
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname}`);
 
@@ -324,11 +404,12 @@ const server = http.createServer(async (req, res) => {
     if (path === '/users' && (req.method === 'GET' || req.method === 'POST')) return await handleUsers(req, res);
     if (/^\/users\/\d+$/.test(path)) return await handleUserById(req, res, path.split('/')[2]);
     if (path === '/activity') return await handleActivity(req, res, url.searchParams);
-    if (path === '/census')     return await handleCensus(res);
-    if (path === '/facilities') return await handleFacilities(res);
-    if (path === '/alerts')     return await handleAlerts(res);
-    if (path === '/trend')      return await handleTrend(res, days);
-    if (path === '/forecast')   return await handleForecast(res, days);
+    if (path === '/census')          return await handleCensus(res, facilityId);
+    if (path === '/facilitiesList')  return await handleFacilitiesList(res);
+    if (path === '/facilities')      return await handleFacilities(res, facilityId);
+    if (path === '/alerts')          return await handleAlerts(res);
+    if (path === '/trend')           return await handleTrend(res, days, facilityId);
+    if (path === '/forecast')        return await handleForecast(res, days, facilityId);
     json(res, { error: 'Not found' }, 404);
   } catch (err) {
     console.error(`  ERROR [${path}]:`, err.message);

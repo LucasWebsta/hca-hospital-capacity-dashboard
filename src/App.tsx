@@ -31,6 +31,11 @@ function App() {
   };
 
   const [trendDays, setTrendDays] = useState(30);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<number | null>(
+    null,
+  );
+  const [selectedFacilityName, setSelectedFacilityName] =
+    useState("All Facilities");
   const [census, setCensus] = useState<CensusMetrics>({
     totalCensus: 948,
     totalCapacity: 1112,
@@ -39,8 +44,11 @@ function App() {
   });
 
   useEffect(() => {
-    api.getCensusMetrics().then(setCensus).catch(console.error);
-  }, []);
+    api
+      .getCensusMetrics(selectedFacilityId ?? undefined)
+      .then(setCensus)
+      .catch(console.error);
+  }, [selectedFacilityId]);
 
   return (
     <div
@@ -67,6 +75,10 @@ function App() {
           trendDays={trendDays}
           onTrendDaysChange={setTrendDays}
           onAlertsClick={() => navigate("/alerts")}
+          onFacilityChange={(id: number | null, name: string) => {
+            setSelectedFacilityId(id);
+            setSelectedFacilityName(name);
+          }}
         />
 
         {activeTab === "dashboard" && (
@@ -140,7 +152,10 @@ function App() {
                           marginTop: 2,
                         }}
                       >
-                        Across 5 facilities · May 7, 2025
+                        {selectedFacilityId
+                          ? selectedFacilityName
+                          : `Across all facilities`}{" "}
+                        · Real-time
                       </div>
                     </div>
                     <span
@@ -208,13 +223,22 @@ function App() {
                     />
                   </div>
                 </div>
-                <OccupancyTrendChart days={trendDays} />
-                <FacilitiesAtRisk />
+
+                <OccupancyTrendChart
+                  days={trendDays}
+                  facilityId={selectedFacilityId ?? undefined}
+                />
+                <FacilitiesAtRisk
+                  facilityId={selectedFacilityId ?? undefined}
+                />
               </div>
+
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 20 }}
               >
-                <ForecastOccupancyChart />
+                <ForecastOccupancyChart
+                  facilityId={selectedFacilityId ?? undefined}
+                />
                 <AlertsPanel />
               </div>
             </div>
