@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell, LogOut, User } from 'lucide-react';
+import { ChevronDown, Bell, LogOut, User, Menu } from 'lucide-react';
 import { api } from '../api';
 import type { FacilityListItem } from '../api';
 import { ProfileModal } from './ProfileModal';
@@ -41,6 +41,7 @@ interface HeaderProps {
   onAlertsClick: () => void;
   onFacilityChange: (facilityId: number | null, name: string) => void;
   selectedFacilityName?: string;
+  onMenuClick?: () => void;
 }
 
 function Dropdown({ label, options, onSelect }: {
@@ -90,7 +91,17 @@ function Dropdown({ label, options, onSelect }: {
   );
 }
 
-export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityName }: HeaderProps) {
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityName, onMenuClick }: HeaderProps) {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
   const sessionUser = getSessionUser();
   const initials = getInitials(sessionUser);
@@ -120,23 +131,45 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
     <div style={{
       background: '#fff',
       borderBottom: `3px solid ${BRAND_ORANGE}`,
-      padding: '0 24px',
-      height: 54,
+      padding: isMobile ? '0 12px' : '0 24px',
+      height: isMobile ? 50 : 54,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       flexShrink: 0,
       boxShadow: '0 2px 8px rgba(9,34,64,0.08)',
     }}>
       {/* Left filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <Dropdown
-          label={facilityLabel}
-          options={['All Facilities', ...facilities.map(f => f.name)]}
-          onSelect={handleFacilitySelect}
-        />
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 6, flex: 1, minWidth: 0 }}>
+        {isMobile && onMenuClick && (
+          <button
+            onClick={onMenuClick}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 6,
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              marginRight: 4,
+              flexShrink: 0,
+            }}
+          >
+            <Menu size={18} color={BRAND_BLUE} />
+          </button>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Dropdown
+            label={facilityLabel}
+            options={['All Facilities', ...facilities.map(f => f.name)]}
+            onSelect={handleFacilitySelect}
+          />
+        </div>
       </div>
 
       {/* Right controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 6, flexShrink: 0 }}>
         <Dropdown
           label={TREND_DAYS.find(d => d.value === trendDays)?.label ?? 'Last 30 days'}
           options={TREND_DAYS.map(d => d.label)}
@@ -151,10 +184,10 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
           onClick={onAlertsClick}
           title="View Alerts"
           style={{
-            width: 34, height: 34, borderRadius: '50%',
+            width: isMobile ? 36 : 34, height: isMobile ? 36 : 34, borderRadius: '50%',
             background: '#f8fafc', border: '1px solid #e2e8f0',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', marginLeft: 2, position: 'relative',
+            cursor: 'pointer', marginLeft: isMobile ? 0 : 2, position: 'relative',
           }}
         >
           <Bell size={15} color={BRAND_BLUE} />
@@ -237,7 +270,9 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
         onClick={() => setOpen(o => !o)}
         title={fullName}
         style={{
-          width: 32, height: 32, borderRadius: '50%',
+          width: 32, 
+          height: 32, 
+          borderRadius: '50%',
           background: BRAND_BLUE, overflow: 'hidden',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
