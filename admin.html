@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - HCA Healthcare</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: #edf1f8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900">Admin Panel</h1>
+                    <p class="text-gray-600 mt-1">User Management & Activity Logs</p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">Logged in as</p>
+                        <p class="font-semibold text-gray-900" id="loggedInUser">Kevin</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold" id="userInitials">
+                        K
+                    </div>
+                    <button
+                        onclick="handleLogout()"
+                        class="ml-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition text-sm"
+                    >
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- LEFT COLUMN - User Management -->
+            <div class="lg:col-span-2">
+                <!-- Users List -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-xl font-bold text-gray-900">Users</h2>
+                        <button
+                            onclick="openAddUserModal()"
+                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-sm"
+                        >
+                            + Add User
+                        </button>
+                    </div>
+
+                    <!-- Users Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Name</th>
+                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Email</th>
+                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
+                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
+                                    <th class="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <!-- Users will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN - Activity Logs -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6">Activity Logs</h2>
+                    
+                    <!-- Filter -->
+                    <div class="mb-4">
+                        <select 
+                            id="logFilter"
+                            onchange="filterLogs()"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="all">All Activities</option>
+                            <option value="signin">Sign In</option>
+                            <option value="signout">Sign Out</option>
+                        </select>
+                    </div>
+
+                    <!-- Logs List -->
+                    <div class="space-y-3 max-h-96 overflow-y-auto" id="logsContainer">
+                        <!-- Logs will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" onclick="closeModalOnBackdrop(event)">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold text-gray-900">Add New User</h3>
+                    <button onclick="closeAddUserModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <form id="addUserForm" onsubmit="handleAddUser(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                    <input
+                        type="text"
+                        id="newFirstName"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                    <input
+                        type="text"
+                        id="newLastName"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                        type="email"
+                        id="newEmail"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <select
+                        id="newRole"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        <option value="Executive Director">Executive Director</option>
+                        <option value="Administrator">Administrator</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Analyst">Analyst</option>
+                        <option value="Viewer">Viewer</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input
+                        type="password"
+                        id="newPassword"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Set initial password"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">User can change this after first login</p>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button
+                        type="submit"
+                        class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                    >
+                        Add User
+                    </button>
+                    <button
+                        type="button"
+                        onclick="closeAddUserModal()"
+                        class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" onclick="closeModalOnBackdrop(event)">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="p-6">
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Delete User</h3>
+                <p class="text-gray-600 mb-6">Are you sure you want to delete <span id="deleteUserName" class="font-semibold"></span>? This action cannot be undone.</p>
+                <div class="flex gap-3">
+                    <button
+                        onclick="confirmDelete()"
+                        class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition"
+                    >
+                        Delete
+                    </button>
+                    <button
+                        onclick="closeDeleteModal()"
+                        class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Authentication check - only Kevin can access admin page
+        (function() {
+            const userStr = sessionStorage.getItem('user');
+            const isAdmin = sessionStorage.getItem('isAdmin');
+            
+            if (!userStr || !isAdmin || isAdmin !== 'true') {
+                // Not authenticated or not Kevin - redirect to login
+                alert('Access denied. Only Kevin can access the admin page.');
+                window.location.href = 'login.html';
+                return;
+            }
+            
+            const user = JSON.parse(userStr);
+            // Double-check it's Kevin
+            if (user.firstName.toLowerCase() !== 'kevin') {
+                alert('Access denied. Only Kevin can access the admin page.');
+                sessionStorage.clear();
+                window.location.href = 'login.html';
+                return;
+            }
+        })();
+
+        // Data storage - loaded from API
+        let users = [];
+        let activityLogs = [];
+        let userToDelete = null;
+
+        // Get API base URL
+        const API_BASE = window.location.protocol === 'file:' 
+            ? 'http://localhost:7071/api'
+            : '/api';
+
+        // Load users from API
+        async function loadUsers() {
+            try {
+                const response = await fetch(`${API_BASE}/users`);
+                if (response.ok) {
+                    users = await response.json();
+                    renderUsers();
+                } else {
+                    console.error('Failed to load users');
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        // Load activity logs from API
+        async function loadActivityLogs(filter = 'all') {
+            try {
+                const url = filter === 'all' 
+                    ? `${API_BASE}/activity?limit=50`
+                    : `${API_BASE}/activity?action=${filter}&limit=50`;
+                const response = await fetch(url);
+                if (response.ok) {
+                    activityLogs = await response.json();
+                    renderLogs(filter);
+                } else {
+                    console.error('Failed to load activity logs');
+                }
+            } catch (error) {
+                console.error('Error loading activity logs:', error);
+            }
+        }
+
+        function renderUsers() {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = users.map(user => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="py-3 px-4">
+                        <div class="font-medium text-gray-900">${user.firstName} ${user.lastName}</div>
+                    </td>
+                    <td class="py-3 px-4 text-gray-600">${user.email}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            user.role === 'Administrator' ? 'bg-purple-100 text-purple-700' :
+                            user.role === 'Executive Director' ? 'bg-blue-100 text-blue-700' :
+                            user.role === 'Manager' ? 'bg-green-100 text-green-700' :
+                            'bg-gray-100 text-gray-700'
+                        }">
+                            ${user.role}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
+                            (user.status || 'Active') === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }">
+                            ${user.status || 'Active'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-right">
+                        <button
+                            onclick="deleteUser(${user.id})"
+                            class="text-red-600 hover:text-red-800 font-medium text-sm"
+                        >
+                            Remove
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderLogs(filter = 'all') {
+            const container = document.getElementById('logsContainer');
+            let filteredLogs = [...activityLogs];
+            
+            if (filter !== 'all') {
+                filteredLogs = filteredLogs.filter(log => log.action === filter);
+            }
+
+            // Sort by timestamp (newest first) - already sorted by API, but ensure it
+            filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            container.innerHTML = filteredLogs.slice(0, 20).map(log => {
+                const date = new Date(log.timestamp);
+                const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const isSignIn = log.action === 'signin';
+                
+                return `
+                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-2 h-2 rounded-full mt-2 ${
+                            isSignIn ? 'bg-green-500' : 'bg-red-500'
+                        }"></div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <p class="font-medium text-gray-900 text-sm">${log.userName}</p>
+                                <p class="text-xs text-gray-500">${dateStr} ${timeStr}</p>
+                            </div>
+                            <p class="text-xs text-gray-600 mt-1">
+                                ${isSignIn ? 'Signed in' : 'Signed out'}
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            if (filteredLogs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No activity logs found</p>';
+            }
+        }
+
+        function filterLogs() {
+            const filter = document.getElementById('logFilter').value;
+            loadActivityLogs(filter);
+        }
+
+        function openAddUserModal() {
+            document.getElementById('addUserModal').classList.remove('hidden');
+            document.getElementById('addUserModal').classList.add('flex');
+        }
+
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').classList.add('hidden');
+            document.getElementById('addUserModal').classList.remove('flex');
+            document.getElementById('addUserForm').reset();
+        }
+
+        function closeModalOnBackdrop(event) {
+            if (event.target === event.currentTarget) {
+                closeAddUserModal();
+                closeDeleteModal();
+            }
+        }
+
+        async function handleAddUser(event) {
+            event.preventDefault();
+            
+            const newUser = {
+                firstName: document.getElementById('newFirstName').value,
+                lastName: document.getElementById('newLastName').value,
+                email: document.getElementById('newEmail').value,
+                role: document.getElementById('newRole').value,
+                password: document.getElementById('newPassword').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(newUser)
+                });
+
+                if (response.ok) {
+                    const addedUser = await response.json();
+                    users.push(addedUser);
+                    renderUsers();
+                    loadActivityLogs(document.getElementById('logFilter').value);
+                    closeAddUserModal();
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to add user');
+                }
+            } catch (error) {
+                console.error('Error adding user:', error);
+                alert('Failed to add user. Please try again.');
+            }
+        }
+
+        function deleteUser(userId) {
+            const user = users.find(u => u.id === userId);
+            if (user) {
+                userToDelete = user;
+                document.getElementById('deleteUserName').textContent = `${user.firstName} ${user.lastName}`;
+                document.getElementById('deleteModal').classList.remove('hidden');
+                document.getElementById('deleteModal').classList.add('flex');
+            }
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.add('hidden');
+            document.getElementById('deleteModal').classList.remove('flex');
+            userToDelete = null;
+        }
+
+        async function confirmDelete() {
+            if (userToDelete) {
+                try {
+                    const response = await fetch(`${API_BASE}/users/${userToDelete.id}`, {
+                        method: 'DELETE',
+                    });
+
+                    if (response.ok) {
+                        users = users.filter(u => u.id !== userToDelete.id);
+                        renderUsers();
+                        loadActivityLogs(document.getElementById('logFilter').value);
+                        closeDeleteModal();
+                    } else {
+                        const error = await response.json();
+                        alert(error.error || 'Failed to delete user');
+                    }
+                } catch (error) {
+                    console.error('Error deleting user:', error);
+                    alert('Failed to delete user. Please try again.');
+                }
+            }
+        }
+
+
+        // Set logged in user name
+        (function() {
+            const userStr = sessionStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                const userNameEl = document.getElementById('loggedInUser');
+                const userInitialsEl = document.getElementById('userInitials');
+                if (userNameEl) {
+                    userNameEl.textContent = `${user.firstName} ${user.lastName}`;
+                }
+                if (userInitialsEl) {
+                    const initials = (user.firstName[0] + user.lastName[0]).toUpperCase();
+                    userInitialsEl.textContent = initials;
+                }
+            }
+        })();
+
+        // Logout function
+        async function handleLogout() {
+            const userStr = sessionStorage.getItem('user');
+            let userId = null;
+            let userName = 'Unknown';
+            
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                userId = user.id;
+                userName = `${user.firstName} ${user.lastName}`;
+            }
+            
+            try {
+                // Call logout API
+                await fetch(`${API_BASE}/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId, userName })
+                });
+            } catch (error) {
+                console.error('Logout API error:', error);
+                // Continue with logout even if API call fails
+            }
+            
+            // Clear session storage and redirect to login
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+        }
+
+        // Initialize - load data from API
+        loadUsers();
+        loadActivityLogs();
+
+        // Refresh activity logs every 30 seconds
+        setInterval(() => {
+            loadActivityLogs(document.getElementById('logFilter').value);
+        }, 30000);
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HCA Healthcare - Executive Dashboard Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-image: url('https://www.hcadam.com/api/public/content/acca2f62af1e469cb9b4c86477cfb6b2?v=fd8acdc1');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        
+        .login-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="login-box relative w-full max-w-md p-8 rounded-2xl shadow-2xl">
+        <!-- Logo/Header -->
+        <div class="text-center mb-8">
+            <img 
+                src="./images/HCA-WHTOrange.png" 
+                alt="HCA Healthcare" 
+                class="mx-auto mb-3 max-h-20 object-contain"
+                onerror="this.style.display='none'"
+            />
+            <p class="text-white/90 text-sm">Executive Dashboard</p>
+        </div>
+
+        <!-- Login Form -->
+        <form class="space-y-6" id="loginForm">
+            <!-- Email Field -->
+            <div>
+                <label for="email" class="block text-sm font-medium text-white mb-2">
+                    Email Address
+                </label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    class="w-full px-4 py-3 rounded-lg bg-black/20 border border-white/40 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/60 focus:border-white/60 focus:bg-black/30 transition"
+                    placeholder="executive@hcahealthcare.com"
+                />
+            </div>
+
+            <!-- Password Field -->
+            <div>
+                <label for="password" class="block text-sm font-medium text-white mb-2">
+                    Password
+                </label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="w-full px-4 py-3 rounded-lg bg-black/20 border border-white/40 text-white placeholder-white/70 focus:outline-none focus:ring-2 focus:ring-white/60 focus:border-white/60 focus:bg-black/30 transition"
+                    placeholder="Enter your password"
+                />
+            </div>
+
+            <!-- Submit Button -->
+            <button
+                type="submit"
+                class="w-full bg-white/25 hover:bg-white/35 text-white font-semibold py-3 px-4 rounded-lg border-2 border-white/50 transition duration-200 shadow-lg hover:shadow-xl hover:border-white/70"
+            >
+                Sign In
+            </button>
+        </form>
+
+        <!-- Footer -->
+        <div class="mt-6 text-center">
+            <p class="text-xs text-white/70">
+                Secure access to HCA Healthcare Executive Dashboard
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function showFieldError(fieldId) {
+            const field = document.getElementById(fieldId);
+            field.classList.add('border-red-500', 'bg-red-500/10');
+            field.classList.remove('border-white/40', 'bg-black/20');
+            
+            // Remove error after 2 seconds
+            setTimeout(() => {
+                field.classList.remove('border-red-500', 'bg-red-500/10');
+                field.classList.add('border-white/40', 'bg-black/20');
+            }, 2000);
+        }
+
+        function showLoginError() {
+            // Show error on both fields
+            showFieldError('email');
+            setTimeout(() => showFieldError('password'), 100);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value.trim();
+            let hasError = false;
+            
+            // Check if fields are empty
+            if (!email) {
+                showFieldError('email');
+                hasError = true;
+            }
+            
+            if (!password) {
+                showFieldError('password');
+                hasError = true;
+            }
+            
+            if (hasError) {
+                return;
+            }
+            
+            // Get API base URL
+            const API_BASE = window.location.protocol === 'file:' 
+                ? 'http://localhost:7071/api'
+                : '/api';
+            
+            // Call login API
+            fetch(`${API_BASE}/auth/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Try to parse error response
+                    return response.json().then(data => {
+                        throw new Error(data.error || `HTTP ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.user && data.canAccessAdmin) {
+                    // Kevin logged in - redirect to admin page
+                    // Store user info in sessionStorage
+                    sessionStorage.setItem('user', JSON.stringify(data.user));
+                    sessionStorage.setItem('isAdmin', 'true');
+                    window.location.href = 'admin.html';
+                } else if (data.user) {
+                    // Other users logged in - redirect to React app (App.tsx via Vite dev server)
+                    // Store user info in sessionStorage
+                    sessionStorage.setItem('user', JSON.stringify(data.user));
+                    sessionStorage.setItem('isAdmin', 'false');
+                    // Redirect to Vite dev server which serves the React app (App.tsx)
+                    window.location.href = 'http://localhost:5175/';
+                } else {
+                    // Incorrect credentials - show error on both fields
+                    showLoginError();
+                }
+            })
+            .catch(error => {
+                // Network error or API not available - show error
+                console.error('Login error:', error);
+                console.error('API_BASE:', API_BASE);
+                alert('Cannot connect to server. Please ensure the API server is running at http://localhost:7071\n\nError: ' + error.message);
+                showLoginError();
+            });
+        });
+    </script>
+</body>
+</html>
+
