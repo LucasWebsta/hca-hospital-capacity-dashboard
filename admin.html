@@ -48,16 +48,63 @@
             background: white;
             z-index: 10;
         }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+            .max-w-7xl {
+                max-width: 100%;
+            }
+            .grid {
+                grid-template-columns: 1fr !important;
+            }
+            .bg-white.rounded-xl {
+                padding: 16px !important;
+            }
+            .table-container {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            table {
+                min-width: 600px;
+            }
+            .flex.items-center.justify-between {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .flex.items-center.gap-4 {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                width: 100%;
+            }
+            .text-right {
+                text-align: left;
+            }
+            img.h-12 {
+                height: 32px;
+            }
+            .max-w-md {
+                max-width: calc(100% - 32px);
+            }
+        }
     </style>
 </head>
-<body class="min-h-screen p-6">
+<body class="min-h-screen p-6" style="padding: 12px;">
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
         <div class="bg-white rounded-xl shadow-sm border-b-4 border-brand-orange p-6 mb-6" style="border-bottom: 3px solid #E75925; box-shadow: 0 2px 8px rgba(9,34,64,0.08);">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-3xl font-bold brand-blue" style="color: #092240;">Admin Panel</h1>
-                    <p class="text-gray-600 mt-1">User Management & Activity Logs</p>
+                    <img 
+                        src="https://www.ucbjournal.com/wp-content/uploads/2022/10/HCA_horizontal_logo_-fullcolor_rgb.png" 
+                        alt="HCA Healthcare" 
+                        class="h-12 object-contain"
+                        onerror="this.style.display='none'"
+                    />
                 </div>
                 <div class="flex items-center gap-4">
                     <div class="text-right">
@@ -77,7 +124,7 @@
             </div>
         </div>
 
-        <div class="grid gap-6" style="grid-template-columns: 1.5fr 1fr;">
+        <div class="grid gap-6" style="grid-template-columns: 1.5fr 1fr;" id="mainGrid">
             <!-- LEFT COLUMN - User Management -->
             <div>
                 <!-- Users List -->
@@ -797,6 +844,19 @@
                 }
             }
         })();
+
+        // Responsive grid handling
+        function updateGridLayout() {
+            const grid = document.getElementById('mainGrid');
+            if (grid && window.innerWidth < 768) {
+                grid.style.gridTemplateColumns = '1fr';
+            } else if (grid) {
+                grid.style.gridTemplateColumns = '1.5fr 1fr';
+            }
+        }
+        
+        window.addEventListener('resize', updateGridLayout);
+        updateGridLayout();
 
         // Logout function
         async function handleLogout() {
