@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import type { Facility } from '../api';
+import { InfoTooltip } from './InfoTooltip';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -28,7 +29,7 @@ function OccupancyBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-export function FacilitiesAtRisk({ facilityId }: { facilityId?: number }) {
+export function FacilitiesAtRisk({ facilityId, tooltipsOn = true }: { facilityId?: number; tooltipsOn?: boolean }) {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +45,12 @@ export function FacilitiesAtRisk({ facilityId }: { facilityId?: number }) {
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: BRAND_BLUE }}>Top Facilities at Risk</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: BRAND_BLUE }}>Top Facilities at Risk</span>
+            {tooltipsOn && (
+              <InfoTooltip text="Facilities with the highest occupancy rates. Green = normal, orange = elevated (≥85%), red = critical (≥90%). Use this to prioritize which sites need capacity or surge support." />
+            )}
+          </div>
           <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Ranked by occupancy rate</div>
         </div>
         <button style={{

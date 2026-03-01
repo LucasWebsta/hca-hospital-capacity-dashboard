@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
 import type { Alert, AlertRule, CensusMetrics, FacilityListItem, CreateAlertRulePayload } from '../api';
+import { InfoTooltip } from './InfoTooltip';
 
 const GENERAL_CAPACITY_THRESHOLD_PCT = 90;
 const ICU_BEDS_THRESHOLD = 50;  // Alert when ICU beds in use exceeds this
@@ -45,7 +46,7 @@ function describeRule(r: AlertRule): string {
   return `${metricLabel} · ${r.condition_type}`;
 }
 
-export function AlertsPanel() {
+export function AlertsPanel({ tooltipsOn = true }: { tooltipsOn?: boolean } = {}) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [census, setCensus] = useState<CensusMetrics | null>(null);
   const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
@@ -173,7 +174,12 @@ export function AlertsPanel() {
       <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)', width: '100%' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Active alerts</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Active alerts</span>
+              {tooltipsOn && (
+                <InfoTooltip text="System-generated alerts when facilities exceed capacity thresholds. Create custom rules below to get notified when specific metrics go above or below your chosen values." />
+              )}
+            </div>
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>{alerts.length} notification{alerts.length !== 1 ? 's' : ''}</div>
           </div>
           <div style={{ display: 'flex', gap: 6 }}>
