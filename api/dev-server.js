@@ -22,6 +22,57 @@ const { getDb } = require('./dist/src/db.js');
 
 const PORT = 7071;
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
+const NOTIFY_COOLDOWN_MS = 15 * 60 * 1000; // 15 min between alert notifications per user
+const lastNotifyByUser = new Map();
+
+/** Normalize to E.164 for US: +1 + 10 digits. Returns null if not valid. */
+function toE164(phone) {
+  if (!phone || typeof phone !== 'string') return null;
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits[0] === '1') return `+${digits}`;
+  return null;
+}
+
+/** Send SMS via Twilio REST API. Requires TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER in env. */
+async function sendTwilioSms(toE164Number, body) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+  if (!accountSid || !authToken || !from) return false;
+  const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+  const params = new URLSearchParams({ To: toE164Number, From: from, Body: body });
+  const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${auth}` },
+    body: params.toString(),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error('[alerts/notify] Twilio error:', res.status, err);
+    return false;
+  }
+  return true;
+}
+
+/** Send email via Resend API. Requires RESEND_API_KEY in env. RESEND_FROM defaults to onboarding@resend.dev for testing. */
+async function sendResendEmail(to, subject, text) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM || 'HCA Alerts <onboarding@resend.dev>';
+  if (!apiKey) return false;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ from, to, subject, text }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error('[alerts/notify] Resend error:', res.status, err);
+    return false;
+  }
+  return true;
+}
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { ...CORS, ...headers });
@@ -69,7 +120,9 @@ const server = http.createServer(async (req, res) => {
         const { email, password } = body;
         if (!email || !password) return send(res, 400, { error: 'Email and password are required' });
         const { rows } = await db.query(
-          `SELECT id, first_name, last_name, email, role, photo_url, phone_number, default_trend_days, password_hash FROM users WHERE email = $1`,
+          `SELECT id, first_name, last_name, email, role, photo_url, phone_number, default_trend_days, password_hash,
+                  COALESCE(notify_email, true) AS notify_email, COALESCE(notify_sms, false) AS notify_sms
+           FROM users WHERE email = $1`,
           [email.toLowerCase()]
         );
         if (rows.length === 0) {
@@ -93,7 +146,7 @@ const server = http.createServer(async (req, res) => {
         } catch (_) { /* table may not exist or different schema */ }
         const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role || '');
         return send(res, 200, {
-          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role, photoUrl: user.photo_url || null, phoneNumber: user.phone_number || null, defaultTrendDays: user.default_trend_days != null ? user.default_trend_days : 30 },
+          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role, photoUrl: user.photo_url || null, phoneNumber: user.phone_number || null, defaultTrendDays: user.default_trend_days != null ? user.default_trend_days : 30, notifyEmail: user.notify_email !== false, notifySms: user.notify_sms === true },
           canAccessAdmin,
         });
       } catch (err) {
@@ -187,6 +240,14 @@ const server = http.createServer(async (req, res) => {
           updates.push(`phone_number = $${p++}`);
           params.push(body.phoneNumber === null || body.phoneNumber === '' ? null : String(body.phoneNumber).trim());
         }
+        if (body.notifyEmail !== undefined) {
+          updates.push(`notify_email = $${p++}`);
+          params.push(!!body.notifyEmail);
+        }
+        if (body.notifySms !== undefined) {
+          updates.push(`notify_sms = $${p++}`);
+          params.push(!!body.notifySms);
+        }
 
         if (updates.length === 0) return send(res, 400, { error: 'No fields to update' });
 
@@ -203,6 +264,8 @@ const server = http.createServer(async (req, res) => {
         if (body.defaultTrendDays !== undefined) out.defaultTrendDays = body.defaultTrendDays;
         if (body.email !== undefined) out.email = body.email.trim().toLowerCase();
         if (body.phoneNumber !== undefined) out.phoneNumber = body.phoneNumber === null || body.phoneNumber === '' ? null : String(body.phoneNumber).trim();
+        if (body.notifyEmail !== undefined) out.notifyEmail = !!body.notifyEmail;
+        if (body.notifySms !== undefined) out.notifySms = !!body.notifySms;
         return send(res, 200, out);
       } catch (err) {
         const msg = err.message || String(err);
@@ -348,6 +411,54 @@ const server = http.createServer(async (req, res) => {
         FROM occ WHERE occupancy_pct >= 75 ORDER BY occupancy_pct DESC
       `);
       return send(res, 200, rows);
+    }
+
+    // POST /api/alerts/notify — send email/SMS for active alerts based on user preferences (with cooldown)
+    if (base === 'alerts/notify' && method === 'POST') {
+      try {
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const userId = body.userId != null ? Number(body.userId) : null;
+        const alerts = Array.isArray(body.alerts) ? body.alerts : [];
+        if (userId == null || Number.isNaN(userId)) return send(res, 400, { error: 'userId is required' });
+        const now = Date.now();
+        const last = lastNotifyByUser.get(userId) || 0;
+        if (alerts.length === 0) return send(res, 200, { sentEmail: false, sentSms: false });
+        if (now - last < NOTIFY_COOLDOWN_MS) return send(res, 200, { sentEmail: false, sentSms: false, cooldown: true });
+
+        const { rows } = await db.query(
+          `SELECT email, phone_number, COALESCE(notify_email, true) AS notify_email, COALESCE(notify_sms, false) AS notify_sms FROM users WHERE id = $1`,
+          [userId]
+        );
+        if (rows.length === 0) return send(res, 404, { error: 'User not found' });
+        const user = rows[0];
+        const summary = alerts.slice(0, 5).map(a => `[${a.severity || 'ALERT'}] ${a.hospital || 'Facility'}: ${a.message || a.id}`).join('\n');
+        let sentEmail = false;
+        let sentSms = false;
+        if (user.notify_email && user.email) {
+          const subject = `HCA Census Alert${alerts.length > 1 ? 's' : ''}`;
+          const text = `You have ${alerts.length} active alert(s):\n\n${summary}\n\n— HCA Census Command`;
+          const ok = await sendResendEmail(user.email, subject, text);
+          if (ok) sentEmail = true;
+          else if (!process.env.RESEND_API_KEY) console.log('[alerts/notify] EMAIL skipped (set RESEND_API_KEY for real email) to', user.email);
+        }
+        if (user.notify_sms && user.phone_number) {
+          const to = toE164(user.phone_number);
+          const smsBody = `HCA Census Alerts:\n${summary}`.slice(0, 1600);
+          if (to) {
+            const ok = await sendTwilioSms(to, smsBody);
+            if (ok) sentSms = true;
+            else console.log('[alerts/notify] SMS skipped (Twilio not configured or send failed) to', user.phone_number);
+          } else {
+            console.log('[alerts/notify] SMS skipped: invalid phone number', user.phone_number);
+          }
+        }
+        if (sentEmail || sentSms) lastNotifyByUser.set(userId, now);
+        return send(res, 200, { sentEmail, sentSms });
+      } catch (err) {
+        console.error('POST alerts/notify error:', err);
+        return send(res, 500, { error: err.message || 'Internal server error' });
+      }
     }
 
     // GET /api/trend (optional ?facility_id=, ?series=overall|icu; overall = census + occupancy %, icu = ICU count)

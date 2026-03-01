@@ -252,4 +252,29 @@ export const api = {
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
       return r.json() as Promise<{ email?: string; phoneNumber?: string | null }>;
     }),
+
+  /** Update current user's notification preferences (email/SMS for alerts). */
+  updateMyNotificationPrefs: (userId: number, prefs: { notifyEmail?: boolean; notifySms?: boolean }) =>
+    fetch(`${BASE}/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...prefs }),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ notifyEmail?: boolean; notifySms?: boolean }>;
+    }),
+
+  /** Request email/SMS delivery for active alerts (respects user prefs and cooldown on server). */
+  notifyAlerts: (alerts: Alert[]) => {
+    const uid = getCurrentUserId();
+    if (uid == null || alerts.length === 0) return Promise.resolve({ sentEmail: false, sentSms: false });
+    return fetch(`${BASE}/alerts/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: uid, alerts }),
+    }).then(async (r) => {
+      if (!r.ok) return { sentEmail: false, sentSms: false };
+      return r.json() as Promise<{ sentEmail: boolean; sentSms: boolean; cooldown?: boolean }>;
+    });
+  },
 };
