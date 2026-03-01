@@ -21,6 +21,10 @@ const METRICS = ["Admissions", "Discharges", "ICU Occupancy", "Total Census"];
 const BRAND_BLUE = "#092240";
 const BRAND_ORANGE = "#E75925";
 
+// Staffing FTE ratios (aligned with scripts/staffing_projection.py; can be calibrated via Kaggle dataset)
+const FTE_PER_GENERAL_CENSUS = 0.25;
+const FTE_PER_ICU_CENSUS = 0.5;
+
 export default function ForecastPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [metrics, setMetrics] = useState<MetricRow[]>([]);
@@ -36,6 +40,7 @@ export default function ForecastPage() {
   >("15min");
   const [loading, setLoading] = useState(true);
   const [validation, setValidation] = useState<ValidationMetrics | null>(null);
+  const [staffingExplanationOpen, setStaffingExplanationOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -602,48 +607,6 @@ export default function ForecastPage() {
         </div>
       )}
 
-      {/* Validation metrics */}
-      {validation && (
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: 12,
-            border: "1px solid #edf0f5",
-            padding: "16px 20px",
-            marginBottom: 20,
-            display: "flex",
-            gap: 32,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
-              MODEL VALIDATION
-            </div>
-            <div style={{ fontSize: 12, color: "#0f172a", marginTop: 4 }}>
-              80/20 train/test split · {validation.trainSize} train points ·{" "}
-              {validation.testSize} test points
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
-              MAE
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
-              {validation.mae}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
-              RMSE
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
-              {validation.rmse}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Forecast Chart */}
       <div
         style={{
@@ -652,6 +615,7 @@ export default function ForecastPage() {
           border: "1px solid #edf0f5",
           padding: "20px 22px",
           boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          marginBottom: 20,
         }}
       >
         <div
@@ -754,6 +718,232 @@ export default function ForecastPage() {
           </LineChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Staffing projection — updates when facility filter changes */}
+      {facility && (
+        <div
+          style={{
+            background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
+            borderRadius: 16,
+            border: "1px solid #e2e8f0",
+            padding: 0,
+            marginBottom: 20,
+            boxShadow: "0 4px 20px rgba(9, 34, 64, 0.08)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header with facility name */}
+          <div
+            style={{
+              background: BRAND_BLUE,
+              color: "#fff",
+              padding: "14px 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 10, letterSpacing: 1, opacity: 0.9, marginBottom: 2 }}>
+                STAFFING PROJECTION
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>
+                {facility.location}
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                Based on latest census for this facility
+              </div>
+            </div>
+          </div>
+
+          {/* Value cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gap: 0,
+              padding: "20px 20px 16px",
+            }}
+          >
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: 12,
+                background: "rgba(9, 34, 64, 0.04)",
+                border: "1px solid rgba(9, 34, 64, 0.08)",
+              }}
+            >
+              <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 6 }}>
+                General beds (census)
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: BRAND_BLUE, lineHeight: 1.1 }}>
+                {Math.max(0, latestCensus - latestICU)}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                × {FTE_PER_GENERAL_CENSUS} FTE per bed
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>
+                = {(Math.max(0, latestCensus - latestICU) * FTE_PER_GENERAL_CENSUS).toFixed(1)} FTE
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: 12,
+                background: "rgba(9, 34, 64, 0.04)",
+                border: "1px solid rgba(9, 34, 64, 0.08)",
+              }}
+            >
+              <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, marginBottom: 6 }}>
+                ICU (census)
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: BRAND_BLUE, lineHeight: 1.1 }}>
+                {latestICU}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                × {FTE_PER_ICU_CENSUS} FTE per bed
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginTop: 4 }}>
+                = {(latestICU * FTE_PER_ICU_CENSUS).toFixed(1)} FTE
+              </div>
+            </div>
+
+            <div
+              style={{
+                padding: "16px",
+                borderRadius: 12,
+                background: `linear-gradient(135deg, ${BRAND_ORANGE}12 0%, ${BRAND_ORANGE}08 100%)`,
+                border: `2px solid ${BRAND_ORANGE}`,
+                gridColumn: "span 1",
+              }}
+            >
+              <div style={{ fontSize: 11, color: "#c2410c", fontWeight: 700, marginBottom: 6 }}>
+                Total projected FTE
+              </div>
+              <div style={{ fontSize: 32, fontWeight: 800, color: BRAND_ORANGE, lineHeight: 1.1 }}>
+                {(
+                  Math.max(0, latestCensus - latestICU) * FTE_PER_GENERAL_CENSUS +
+                  latestICU * FTE_PER_ICU_CENSUS
+                ).toFixed(1)}
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                General FTE + ICU FTE
+              </div>
+            </div>
+          </div>
+
+          {/* How we calculate this — expandable */}
+          <div style={{ borderTop: "1px solid #e2e8f0", padding: "0 20px 16px" }}>
+            <button
+              type="button"
+              onClick={() => setStaffingExplanationOpen((o) => !o)}
+              style={{
+                marginTop: 12,
+                padding: "8px 0",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+                color: BRAND_BLUE,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              {staffingExplanationOpen ? "▼" : "▶"} How we calculate these values
+            </button>
+            {staffingExplanationOpen && (
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "14px 16px",
+                  background: "#f8fafc",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  color: "#475569",
+                  lineHeight: 1.6,
+                }}
+              >
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>General beds (census)</strong> = Total Census − ICU Occupancy. This is the latest non-ICU occupied bed count from your data for this facility.
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>ICU (census)</strong> = Latest ICU Occupancy value for this facility (occupied ICU beds).
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>General FTE</strong> = General beds × {FTE_PER_GENERAL_CENSUS}. We use {FTE_PER_GENERAL_CENSUS} FTE per occupied general bed (benchmark: about 1 FTE per 4 beds).
+                  </li>
+                  <li style={{ marginBottom: 8 }}>
+                    <strong>ICU FTE</strong> = ICU census × {FTE_PER_ICU_CENSUS}. ICU uses a higher ratio ({FTE_PER_ICU_CENSUS} FTE per bed) because ICU care is more staff-intensive.
+                  </li>
+                  <li>
+                    <strong>Total projected FTE</strong> = General FTE + ICU FTE. This is the estimated nursing/staff FTE needed to support the current census at this facility.
+                  </li>
+                </ul>
+                <p style={{ margin: "12px 0 0", fontSize: 11, color: "#94a3b8" }}>
+                  Ratios are calculated using the{" "}
+                  <a
+                    href="https://www.kaggle.com/datasets/endernel/capacity-of-hospitals-bed"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: BRAND_BLUE, fontWeight: 600 }}
+                  >
+                    Kaggle hospital capacity dataset
+                  </a>
+                  
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Validation metrics */}
+      {validation && (
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: 12,
+            border: "1px solid #edf0f5",
+            padding: "16px 20px",
+            marginBottom: 20,
+            display: "flex",
+            gap: 32,
+            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              MODEL VALIDATION
+            </div>
+            <div style={{ fontSize: 12, color: "#0f172a", marginTop: 4 }}>
+              80/20 train/test split · {validation.trainSize} train points ·{" "}
+              {validation.testSize} test points
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              MAE
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
+              {validation.mae}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+              RMSE
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
+              {validation.rmse}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
