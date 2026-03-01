@@ -102,11 +102,11 @@ export interface CreateAlertRulePayload {
 // ─────────────────────────────────────────────
 
 export const api = {
-  getCensusMetrics: () => get<CensusMetrics>('/census'),
-  getFacilities:    () => get<Facility[]>('/facilities'),
+  getCensusMetrics: (facilityId?: number) => get<CensusMetrics>(facilityId ? `/census?facility_id=${facilityId}` : '/census'),
+  getFacilities:    (facilityId?: number) => get<Facility[]>(facilityId ? `/facilities?facility_id=${facilityId}` : '/facilities'),
   getAlerts:        () => get<Alert[]>('/alerts'),
-  getTrend:         (days = 30) => get<TrendPoint[]>(`/trend?days=${days}`),
-  getForecast:      (days = 7)  => get<ForecastResponse>(`/forecast?days=${days}`),
+  getTrend:         (days = 30, facilityId?: number) => get<TrendPoint[]>(`/trend?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
+  getForecast:      (days = 7, facilityId?: number)  => get<ForecastResponse>(`/forecast?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
   getFacilitiesList: () => get<FacilityListItem[]>('/facilitiesList'),
   getMetricTypes:   () => get<string[]>('/metricTypes'),
   getAlertRules:    () => {
