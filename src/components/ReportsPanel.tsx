@@ -164,7 +164,7 @@ export function ReportsPanel() {
     <div className="reports-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <div style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', letterSpacing: -0.3 }}>Reports</div>
-        <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 3, fontWeight: 500 }}>
+        <div style={{ fontSize: 12.5, color: '#475569', marginTop: 3, fontWeight: 500 }}>
           Configure your report, then export as PDF, share a link, or save a snapshot.
         </div>
       </div>
@@ -201,13 +201,14 @@ export function ReportsPanel() {
         {/* Config sidebar */}
         <div style={{
           width: 260, flexShrink: 0,
-          background: '#fff', borderRadius: 12, border: '1px solid #edf0f5',
-          padding: 16, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+          background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+          borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)',
+          padding: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           height: 'fit-content',
         }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: BRAND_BLUE, marginBottom: 12 }}>Report configuration</div>
 
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Facility</label>
+          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Facility</label>
           <select
             value={config.facilityId ?? ''}
             onChange={(e) => {
@@ -226,7 +227,7 @@ export function ReportsPanel() {
             ))}
           </select>
 
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 4 }}>Trend period</label>
+          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Trend period</label>
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
             {TREND_DAYS_OPTIONS.map((d) => (
               <button
@@ -237,7 +238,7 @@ export function ReportsPanel() {
                   flex: 1, padding: '6px 8px', borderRadius: 6, border: `1px solid ${config.trendDays === d ? BRAND_BLUE : '#e2e8f0'}`,
                   fontSize: 11, fontWeight: 600, cursor: 'pointer',
                   background: config.trendDays === d ? BRAND_BLUE : '#fff',
-                  color: config.trendDays === d ? '#fff' : '#64748b',
+                  color: config.trendDays === d ? '#fff' : '#374151',
                 }}
               >
                 {d}d
@@ -245,7 +246,7 @@ export function ReportsPanel() {
             ))}
           </div>
 
-          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#64748b', marginBottom: 8 }}>Sections to include</label>
+          <label style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Sections to include</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
             {SECTION_OPTIONS.map(({ id, label }) => (
               <label key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, cursor: 'pointer' }}>
@@ -315,13 +316,13 @@ export function ReportsPanel() {
           ref={reportRef}
           id="report-content"
           style={{
-            flex: 1, overflowY: 'auto', background: '#fff', borderRadius: 12,
-            border: '1px solid #edf0f5', padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+            flex: 1, overflowY: 'auto', background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+            borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)', padding: 24, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           }}
         >
-          <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: 16, fontWeight: 700, color: BRAND_BLUE }}>Census Command Report</div>
-            <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
               {config.facilityName} · {config.trendDays}-day trend
               {isSnapshotView && data?.capturedAt && (
                 <> · Snapshot: {formatSnapshotDate(data.capturedAt)}</>
@@ -380,7 +381,7 @@ export function ReportsPanel() {
           )}
 
           {config.sections.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: '#475569', fontSize: 13 }}>
               Select at least one section in the configuration panel.
             </div>
           )}
@@ -393,7 +394,7 @@ export function ReportsPanel() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 24 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 10, letterSpacing: 0.5 }}>{title.toUpperCase()}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 10, letterSpacing: 0.5 }}>{title.toUpperCase()}</div>
       {children}
     </div>
   );
@@ -404,7 +405,7 @@ function LiveOverview({ facilityId, facilityName }: { facilityId: number | null;
   useEffect(() => {
     api.getCensusMetrics(facilityId ?? undefined).then(setCensus).catch(console.error);
   }, [facilityId]);
-  if (!census) return <div style={{ padding: 16, color: '#94a3b8' }}>Loading…</div>;
+  if (!census) return <div style={{ padding: 16, color: '#475569' }}>Loading…</div>;
   return <OverviewBlock census={census} />;
 }
 
@@ -423,7 +424,7 @@ function TrendBlock({ data }: { data: TrendPoint[] }) {
   const hasActual = data.some((d) => d.actual != null);
   return (
     <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, border: '1px solid #e2e8f0' }}>
-      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Historical trend (last {data.length} points)</div>
+      <div style={{ fontSize: 12, color: '#374151', marginBottom: 8 }}>Historical trend (last {data.length} points)</div>
       {hasActual ? (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {data.filter((d) => d.actual != null).slice(-14).map((d, i) => (
@@ -433,7 +434,7 @@ function TrendBlock({ data }: { data: TrendPoint[] }) {
           ))}
         </div>
       ) : (
-        <div style={{ color: '#94a3b8', fontSize: 12 }}>No trend data in snapshot.</div>
+        <div style={{ color: '#475569', fontSize: 12 }}>No trend data in snapshot.</div>
       )}
     </div>
   );
@@ -443,7 +444,7 @@ function ForecastBlock({ data }: { data: ForecastResponse }) {
   const pts = data.data?.slice(0, 7) ?? [];
   return (
     <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, border: '1px solid #e2e8f0' }}>
-      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Forecast · MAE {data.stats?.mae?.toFixed(1) ?? '—'}</div>
+      <div style={{ fontSize: 12, color: '#374151', marginBottom: 8 }}>Forecast · MAE {data.stats?.mae?.toFixed(1) ?? '—'}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {pts.map((d, i) => (
           <span key={i} style={{ background: '#fff', padding: '4px 10px', borderRadius: 6, fontSize: 12, border: '1px solid #e2e8f0' }}>
@@ -461,15 +462,15 @@ function FacilitiesBlock({ facilities }: { facilities: Facility[] }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-            <th style={{ textAlign: 'left', padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Hospital</th>
-            <th style={{ textAlign: 'right', padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Census</th>
-            <th style={{ textAlign: 'right', padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Occupancy</th>
-            <th style={{ textAlign: 'center', padding: '8px 0', color: '#64748b', fontWeight: 600 }}>Trend</th>
+            <th style={{ textAlign: 'left', padding: '8px 0', color: '#374151', fontWeight: 600 }}>Hospital</th>
+            <th style={{ textAlign: 'right', padding: '8px 0', color: '#374151', fontWeight: 600 }}>Census</th>
+            <th style={{ textAlign: 'right', padding: '8px 0', color: '#374151', fontWeight: 600 }}>Occupancy</th>
+            <th style={{ textAlign: 'center', padding: '8px 0', color: '#374151', fontWeight: 600 }}>Trend</th>
           </tr>
         </thead>
         <tbody>
           {facilities.map((f, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
+            <tr key={i} style={{ borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
               <td style={{ padding: '10px 0', fontWeight: 500 }}>{f.name}</td>
               <td style={{ textAlign: 'right', padding: '10px 0' }}>{f.census}</td>
               <td style={{ textAlign: 'right', padding: '10px 0' }}>{Number(f.occupancy).toFixed(1)}%</td>
@@ -487,12 +488,12 @@ function AlertsBlock({ alerts }: { alerts: Alert[] }) {
   return (
     <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, border: '1px solid #e2e8f0' }}>
       {active.length === 0 ? (
-        <div style={{ color: '#64748b', fontSize: 12 }}>No active alerts.</div>
+        <div style={{ color: '#374151', fontSize: 12 }}>No active alerts.</div>
       ) : (
         <ul style={{ margin: 0, paddingLeft: 18 }}>
           {active.map((a, i) => (
             <li key={i} style={{ marginBottom: 6, fontSize: 12 }}>
-              <span style={{ fontWeight: 600, color: a.severity === 'HIGH' ? '#dc2626' : a.severity === 'MEDIUM' ? BRAND_ORANGE : '#64748b' }}>{a.severity}</span>: {a.message}
+              <span style={{ fontWeight: 600, color: a.severity === 'HIGH' ? '#dc2626' : a.severity === 'MEDIUM' ? BRAND_ORANGE : '#374151' }}>{a.severity}</span>: {a.message}
             </li>
           ))}
         </ul>

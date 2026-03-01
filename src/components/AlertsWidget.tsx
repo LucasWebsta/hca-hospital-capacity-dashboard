@@ -73,10 +73,12 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
 
   return (
     <div style={{
-      background: '#fff',
+      background: 'rgba(255,255,255,0.65)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
       borderRadius: 12,
-      border: '1px solid #e8ecf2',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+      border: '1px solid rgba(255,255,255,0.65)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
@@ -84,7 +86,7 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
       {/* Header */}
       <div style={{
         padding: '13px 16px 11px',
-        borderBottom: '1px solid #f1f5f9',
+        borderBottom: '1px solid rgba(0,0,0,0.08)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -97,7 +99,7 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
           <button
             onClick={reload}
             style={{
-              fontSize: 11, color: '#94a3b8', background: 'none',
+              fontSize: 11, color: '#475569', background: 'none',
               border: '1px solid #e2e8f0', borderRadius: 5,
               padding: '3px 7px', cursor: 'pointer', lineHeight: 1.3,
             }}
@@ -108,7 +110,7 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
             <button
               onClick={dismissAll}
               style={{
-                fontSize: 10.5, color: '#94a3b8', background: 'none',
+                fontSize: 10.5, color: '#475569', background: 'none',
                 border: '1px solid #e2e8f0', borderRadius: 5,
                 padding: '3px 7px', cursor: 'pointer',
               }}
@@ -122,19 +124,19 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
       {/* Scrollable alert list */}
       <div style={{ overflowY: 'auto', maxHeight: 260, flexShrink: 0 }}>
         {loading ? (
-          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#9ca3af' }}>
+          <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: '#4b5563' }}>
             Loading…
           </div>
         ) : error ? (
           <div style={{ padding: '20px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#dc2626' }}>Could not load alerts</div>
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 3 }}>{error}</div>
+            <div style={{ fontSize: 11, color: '#475569', marginTop: 3 }}>{error}</div>
             <button onClick={reload} style={{ marginTop: 8, fontSize: 11, color: BLUE, background: 'none', border: '1px solid #e2e8f0', borderRadius: 5, padding: '3px 9px', cursor: 'pointer' }}>Retry</button>
           </div>
         ) : visible.length === 0 ? (
           <div style={{ padding: '24px 16px', textAlign: 'center' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>All clear</div>
-            <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 3 }}>No active alerts{facilityId ? ' for this facility' : ''}</div>
+            <div style={{ fontSize: 11.5, color: '#4b5563', marginTop: 3 }}>No active alerts{facilityId ? ' for this facility' : ''}</div>
           </div>
         ) : (
           <div>
@@ -149,7 +151,7 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
                     alignItems: 'center',
                     gap: 10,
                     padding: '9px 14px 9px 12px',
-                    borderBottom: '1px solid #f1f5f9',
+                    borderBottom: '1px solid rgba(0,0,0,0.08)',
                     background: isMuted ? '#fafafa' : '#fff',
                     opacity: isMuted ? 0.6 : 1,
                     transition: 'opacity .15s, background .15s',
@@ -179,7 +181,7 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
                       </span>
                     </div>
                     <div style={{
-                      fontSize: 11, color: '#64748b',
+                      fontSize: 11, color: '#374151',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {a.message}
@@ -187,7 +189,7 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
                   </div>
 
                   {/* Time */}
-                  <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0, minWidth: 44, textAlign: 'right' }}>
+                  <span style={{ fontSize: 10, color: '#475569', flexShrink: 0, minWidth: 44, textAlign: 'right' }}>
                     {timeAgo(a.triggered_at)}
                   </span>
 
@@ -238,13 +240,13 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
         <div style={{
           padding: '8px 16px',
           borderTop: '1px solid #f1f5f9',
-          fontSize: 11, color: '#94a3b8',
+          fontSize: 11, color: '#475569',
           flexShrink: 0,
         }}>
           {dismissed.size > 0 && (
             <button
               onClick={() => setDismissed(new Set())}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#94a3b8', padding: 0 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#475569', padding: 0 }}
             >
               ↩ Restore {dismissed.size} dismissed
             </button>

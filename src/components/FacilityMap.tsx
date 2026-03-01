@@ -106,11 +106,13 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
   return (
     <div
       style={{
-        background: '#fff',
+        background: 'rgba(255,255,255,0.65)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         borderRadius: 14,
-        border: '1px solid #e2e8f0',
+        border: '1px solid rgba(255,255,255,0.65)',
         overflow: 'hidden',
-        boxShadow: '0 2px 8px rgba(9,34,64,0.07), 0 8px 24px rgba(9,34,64,0.05)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       }}
     >
       {/* Header */}
@@ -120,13 +122,13 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #f1f5f9',
+          borderBottom: '1px solid rgba(0,0,0,0.08)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: BLUE }}>Facility Network</span>
-          <span style={{ fontSize: 11.5, color: '#94a3b8' }}>•</span>
-          <span style={{ fontSize: 11.5, color: '#94a3b8' }}>
+          <span style={{ fontSize: 11.5, color: '#475569' }}>•</span>
+          <span style={{ fontSize: 11.5, color: '#475569' }}>
             {selectedFacilityId
               ? `${FACILITY_LOCATIONS[selectedFacilityId]?.city ?? 'Selected'} — click map or pill to change`
               : 'Click a location to filter the dashboard'}
@@ -160,16 +162,18 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
                 background: color,
                 boxShadow: `0 0 6px ${color}`,
               }} />
-              <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>{label}</span>
+              <span style={{ fontSize: 11, color: '#374151', fontWeight: 500 }}>{label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Dark map canvas */}
+      {/* Map canvas — glass-tinted so background image shows through */}
       <div style={{
         position: 'relative',
-        background: 'linear-gradient(160deg, #0d1e38 0%, #0f2848 60%, #0a1a30 100%)',
+        background: 'rgba(10, 22, 48, 0.55)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
       }}>
         <ComposableMap
           projection="geoAlbersUsa"
@@ -193,12 +197,12 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
                 <Geography
                   key={geo.rsmKey}
                   geography={geo}
-                  fill="#1a3260"
+                  fill="rgba(26, 50, 96, 0.75)"
                   stroke="#2a4a82"
                   strokeWidth={0.6}
                   style={{
                     default: { outline: 'none' },
-                    hover:   { outline: 'none', fill: '#1e3a70' },
+                    hover:   { outline: 'none', fill: 'rgba(30, 58, 112, 0.85)' },
                     pressed: { outline: 'none' },
                   }}
                 />
@@ -213,11 +217,25 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
             const glow       = occupancyGlow(facility.occupancy);
             const isSelected = selectedFacilityId === facility.id;
             const isHovered  = hovered === facility.id;
+            const isCritical = facility.occupancy >= 95;
             const r   = isSelected ? 13 : isHovered ? 12 : 10;
             const pct = Math.round(facility.occupancy);
 
             return (
               <Marker key={facility.id} coordinates={loc.coords}>
+                {/* Critical pulse rings */}
+                {isCritical && (
+                  <>
+                    <circle r={r + 8} fill="none" stroke="#f87171" strokeWidth={1.5} style={{ pointerEvents: 'none' }}>
+                      <animate attributeName="r" values={`${r + 8};${r + 22};${r + 8}`} dur="2s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.7;0;0.7" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                    <circle r={r + 8} fill="none" stroke="#f87171" strokeWidth={1} style={{ pointerEvents: 'none' }}>
+                      <animate attributeName="r" values={`${r + 8};${r + 28};${r + 8}`} dur="2s" begin="0.5s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" begin="0.5s" repeatCount="indefinite" />
+                    </circle>
+                  </>
+                )}
                 {/* Outer ambient glow */}
                 <circle r={r + 9} fill={glow} style={{ pointerEvents: 'none' }} />
                 {/* Mid ring */}
@@ -290,7 +308,7 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
               flexShrink: 0,
             }} />
             <span style={{ fontWeight: 700, color: '#f1f5f9' }}>{hoveredFacility.name}</span>
-            <span style={{ color: '#94a3b8', fontSize: 11.5 }}>{FACILITY_LOCATIONS[hoveredFacility.id]?.city}</span>
+            <span style={{ color: '#475569', fontSize: 11.5 }}>{FACILITY_LOCATIONS[hoveredFacility.id]?.city}</span>
             <span style={{
               background: occupancyColor(hoveredFacility.occupancy) + '28',
               border: `1px solid ${occupancyColor(hoveredFacility.occupancy)}55`,
@@ -300,7 +318,7 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
             }}>
               {Math.round(hoveredFacility.occupancy)}%
             </span>
-            <span style={{ color: '#64748b', fontSize: 11 }}>
+            <span style={{ color: '#374151', fontSize: 11 }}>
               {occupancyLabel(hoveredFacility.occupancy)}
             </span>
             {hoveredFacility.capacity > 0 && (
@@ -317,7 +335,7 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'rgba(13,30,56,0.7)',
           }}>
-            <span style={{ fontSize: 12, color: '#94a3b8' }}>Loading map data…</span>
+            <span style={{ fontSize: 12, color: '#475569' }}>Loading map data…</span>
           </div>
         )}
       </div>

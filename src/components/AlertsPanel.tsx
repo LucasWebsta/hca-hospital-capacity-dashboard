@@ -44,7 +44,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       <div style={{ position: 'relative', width: 32, height: 18, borderRadius: 9, background: on ? BLUE : '#d1d5db', transition: 'background .18s' }}>
         <div style={{ position: 'absolute', top: 2, left: on ? 14 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .18s', boxShadow: '0 1px 2px rgba(0,0,0,0.18)' }} />
       </div>
-      <span style={{ fontSize: 11, fontWeight: 600, color: on ? BLUE : '#9ca3af', letterSpacing: 0.2, minWidth: 32 }}>
+      <span style={{ fontSize: 11, fontWeight: 600, color: on ? BLUE : '#4b5563', letterSpacing: 0.2, minWidth: 32 }}>
         {on ? 'Live' : 'Muted'}
       </span>
     </button>
@@ -52,14 +52,15 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 }
 
 const card: React.CSSProperties = {
-  background: '#fff', borderRadius: 12, border: '1px solid #e8ecf2',
-  padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+  background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
+  borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)',
+  padding: '18px 20px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
 };
 const fLabel: React.CSSProperties = {
-  fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, display: 'block',
+  fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 4, display: 'block',
 };
 const fInput: React.CSSProperties = {
-  width: '100%', padding: '7px 9px', borderRadius: 7, border: '1px solid #e2e8f0',
+  width: '100%', padding: '7px 9px', borderRadius: 7, border: '1px solid rgba(0,0,0,0.12)',
   fontSize: 12.5, color: BLUE, background: '#fff', outline: 'none', boxSizing: 'border-box',
 };
 
@@ -138,26 +139,26 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Toggle on={notifOn} onChange={setNotifOn} />
-                <button onClick={reload} style={{ fontSize: 11, color: '#6b7280', background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '4px 9px', cursor: 'pointer' }}>↻</button>
+                <button onClick={reload} style={{ fontSize: 11, color: '#374151', background: 'none', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, padding: '4px 9px', cursor: 'pointer' }}>↻</button>
               </div>
             </div>
 
             {!notifOn ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Alerts muted</div>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>Toggle Live to resume</div>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 3 }}>Toggle Live to resume</div>
               </div>
             ) : alerts.length === 0 ? (
               <div style={{ padding: '32px 0', textAlign: 'center' }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>All clear</div>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 3 }}>No facilities above threshold</div>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 3 }}>No facilities above threshold</div>
               </div>
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr>
                     {['Facility', 'Message', 'Level', 'Time'].map((h, i) => (
-                      <th key={h} style={{ textAlign: i >= 2 ? (i === 2 ? 'center' : 'right') : 'left', fontSize: 10, fontWeight: 600, color: '#9ca3af', paddingBottom: 8, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9', ...(i === 2 ? { width: 72 } : i === 3 ? { width: 56 } : {}) }}>{h}</th>
+                      <th key={h} style={{ textAlign: i >= 2 ? (i === 2 ? 'center' : 'right') : 'left', fontSize: 10, fontWeight: 600, color: '#4b5563', paddingBottom: 8, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid rgba(0,0,0,0.08)', ...(i === 2 ? { width: 72 } : i === 3 ? { width: 56 } : {}) }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -176,7 +177,7 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
                         <td style={{ padding: '10px 0', textAlign: 'center' }}>
                           <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, background: sc + '18', color: sc, border: `1px solid ${sc}28` }}>{a.severity}</span>
                         </td>
-                        <td style={{ padding: '10px 0', textAlign: 'right', fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '10px 0', textAlign: 'right', fontSize: 11, color: '#4b5563', whiteSpace: 'nowrap' }}>
                           {new Date(a.triggered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
                       </tr>
@@ -192,12 +193,12 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
               <span style={{ fontSize: 13.5, fontWeight: 700, color: BLUE }}>My Alert Rules</span>
               {rules.length > 0 && (
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', background: '#f3f4f6', borderRadius: 20, padding: '1px 9px' }}>{rules.length}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#374151', background: '#f3f4f6', borderRadius: 20, padding: '1px 9px' }}>{rules.length}</span>
               )}
             </div>
 
             {rules.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 12, color: '#9ca3af' }}>
+              <div style={{ padding: '24px 0', textAlign: 'center', fontSize: 12, color: '#4b5563' }}>
                 No rules yet — create one using the form →
               </div>
             ) : (
@@ -205,7 +206,7 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
                 <thead>
                   <tr>
                     {['Facility', 'Metric', 'Condition', 'Added', ''].map((h, i) => (
-                      <th key={i} style={{ textAlign: i === 3 ? 'right' : 'left', fontSize: 10, fontWeight: 600, color: '#9ca3af', paddingBottom: 8, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid #f1f5f9', ...(i === 4 ? { width: 24 } : {}) }}>{h}</th>
+                      <th key={i} style={{ textAlign: i === 3 ? 'right' : 'left', fontSize: 10, fontWeight: 600, color: '#4b5563', paddingBottom: 8, letterSpacing: 0.4, textTransform: 'uppercase', borderBottom: '1px solid rgba(0,0,0,0.08)', ...(i === 4 ? { width: 24 } : {}) }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -219,7 +220,7 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
                           {describeRule(r)}
                         </span>
                       </td>
-                      <td style={{ padding: '10px 0', textAlign: 'right', fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '10px 0', textAlign: 'right', fontSize: 11, color: '#4b5563', whiteSpace: 'nowrap' }}>
                         {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </td>
                       <td style={{ padding: '10px 0 10px 8px' }}>
@@ -301,7 +302,7 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
                 style={{
                   marginTop: 4, width: '100%', padding: '9px 0',
                   background: submitting || !form.facilityId || !form.metric ? '#e5e7eb' : ORANGE,
-                  color: submitting || !form.facilityId || !form.metric ? '#9ca3af' : '#fff',
+                  color: submitting || !form.facilityId || !form.metric ? '#4b5563' : '#fff',
                   fontWeight: 700, fontSize: 13, border: 'none', borderRadius: 8,
                   cursor: submitting || !form.facilityId || !form.metric ? 'not-allowed' : 'pointer',
                   boxShadow: submitting || !form.facilityId || !form.metric ? 'none' : '0 2px 8px rgba(231,89,37,0.28)',
@@ -315,7 +316,7 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
           <div style={card}>
             <div style={{ fontSize: 13.5, fontWeight: 700, color: BLUE, marginBottom: 14 }}>System Status</div>
             {facilities.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#9ca3af' }}>Loading…</div>
+              <div style={{ fontSize: 12, color: '#4b5563' }}>Loading…</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {facilities.map(f => {

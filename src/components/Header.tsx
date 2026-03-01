@@ -10,7 +10,7 @@ const BRAND_ORANGE = '#E75925';
 
 const pill: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 5,
-  padding: '5px 13px', border: '1px solid #e2e8f0', borderRadius: 7,
+  padding: '5px 13px', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 7,
   background: '#fff', fontSize: 12.5, fontWeight: 500, color: '#374151',
   cursor: 'pointer', whiteSpace: 'nowrap',
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
@@ -68,12 +68,12 @@ function Dropdown({ label, options, onSelect }: {
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button style={pill} onClick={() => setOpen(o => !o)}>
-        {selected} <ChevronDown size={13} color="#9ca3af" />
+        {selected} <ChevronDown size={13} color="#4b5563" />
       </button>
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 999,
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+          background: '#fff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8,
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 170, padding: '4px 0',
         }}>
           {options.map(opt => (
@@ -129,7 +129,9 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
 
   return (
     <div style={{
-      background: '#fff',
+      background: 'rgba(255,255,255,0.65)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
       borderBottom: `3px solid ${BRAND_ORANGE}`,
       padding: isMobile ? '0 12px' : '0 24px',
       height: isMobile ? 50 : 54,
@@ -146,8 +148,8 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
               width: 36,
               height: 36,
               borderRadius: 6,
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
+              background: 'rgba(0,0,0,0.06)',
+              border: '1px solid rgba(0,0,0,0.12)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -205,7 +207,7 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
           title="View Alerts"
           style={{
             width: isMobile ? 36 : 34, height: isMobile ? 36 : 34, borderRadius: '50%',
-            background: '#f8fafc', border: '1px solid #e2e8f0',
+            background: 'rgba(0,0,0,0.06)', border: '1px solid rgba(0,0,0,0.12)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             cursor: 'pointer', marginLeft: isMobile ? 0 : 2, position: 'relative',
           }}
@@ -308,13 +310,13 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 999,
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+          background: '#fff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10,
           boxShadow: '0 8px 24px rgba(0,0,0,0.13)', minWidth: 200, padding: '6px 0',
         }}>
           {/* User info header */}
-          <div style={{ padding: '10px 16px 8px', borderBottom: '1px solid #f1f5f9' }}>
+          <div style={{ padding: '10px 16px 8px', borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{fullName}</div>
-            <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>{role}</div>
+            <div style={{ fontSize: 11.5, color: '#374151', marginTop: 1 }}>{role}</div>
           </div>
 
           {/* Profile */}
@@ -327,7 +329,7 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
               fontSize: 13, color: '#374151', textAlign: 'left',
             }}
           >
-            <User size={15} color="#6b7280" />
+            <User size={15} color="#374151" />
             Profile
           </button>
 

@@ -66,6 +66,14 @@ function App() {
   const [metricTooltipsOn, setMetricTooltipsOn] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [displayedFacilityId, setDisplayedFacilityId] = useState<number | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('user');
+      if (!raw) return null;
+      const user = JSON.parse(raw) as { homeFacilityId?: number };
+      return user?.homeFacilityId ?? null;
+    } catch { return null; }
+  });
 
   useEffect(() => {
     const checkMobile = () => {
@@ -77,18 +85,28 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const t = setTimeout(() => {
+      setDisplayedFacilityId(selectedFacilityId);
+    }, 200);
+    return () => clearTimeout(t);
+  }, [selectedFacilityId]);
+
+  useEffect(() => {
     api
-      .getCensusMetrics(selectedFacilityId ?? undefined)
+      .getCensusMetrics(displayedFacilityId ?? undefined)
       .then(setCensus)
       .catch(console.error);
-  }, [selectedFacilityId]);
+  }, [displayedFacilityId]);
 
   return (
     <div
       style={{
         display: "flex",
         height: "100vh",
-        background: "#edf1f8",
+        backgroundImage: 'url("/bg.jpg")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundColor: "#0d1f38",
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         overflow: "hidden",
@@ -157,16 +175,19 @@ function App() {
               }}
             >
               <div
-                style={{ display: "flex", flexDirection: "column", gap: 20 }}
+                style={{
+                  display: "flex", flexDirection: "column", gap: 20,
+                }}
               >
                 <div
                   style={{
-                    background: "#fff",
+                    background: "rgba(255,255,255,0.65)",
+                    backdropFilter: "blur(4px)",
+                    WebkitBackdropFilter: "blur(4px)",
                     borderRadius: 12,
-                    border: "1px solid #edf0f5",
+                    border: "1px solid rgba(255,255,255,0.65)",
                     padding: "20px 22px",
-                    boxShadow:
-                      "0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)",
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
                   }}
                 >
                   <div
@@ -209,8 +230,8 @@ function App() {
                           </button>
                         )}
                       </div>
-                      <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>
-                        {selectedFacilityId ? selectedFacilityName : "Across all facilities"} · Real-time
+                      <div style={{ fontSize: 11.5, color: "#475569", marginTop: 2 }}>
+                        {displayedFacilityId ? selectedFacilityName : "Across all facilities"} · Real-time
                       </div>
                     </div>
                     
@@ -298,19 +319,21 @@ function App() {
 
                 <OccupancyTrendChart
                   days={trendDays}
-                  facilityId={selectedFacilityId ?? undefined}
+                  facilityId={displayedFacilityId ?? undefined}
                   tooltipsOn={metricTooltipsOn}
                 />
               </div>
 
               <div
-                style={{ display: "flex", flexDirection: "column", gap: 20 }}
+                style={{
+                  display: "flex", flexDirection: "column", gap: 20,
+                }}
               >
                 <ForecastOccupancyChart
-                  facilityId={selectedFacilityId ?? undefined}
+                  facilityId={displayedFacilityId ?? undefined}
                   tooltipsOn={metricTooltipsOn}
                 />
-                <AlertsWidget facilityId={selectedFacilityId} />
+                <AlertsWidget facilityId={displayedFacilityId} />
               </div>
             </div>
 
@@ -328,7 +351,7 @@ function App() {
             >
               <label
                 htmlFor="metric-tooltips-toggle"
-                style={{ fontSize: 12.5, color: "#64748b", fontWeight: 500, cursor: "pointer" }}
+                style={{ fontSize: 12.5, color: "#374151", fontWeight: 500, cursor: "pointer" }}
               >
                 Show explanations and tooltips
               </label>
@@ -387,7 +410,7 @@ function App() {
                 <h3 style={{ fontSize: 22, fontWeight: 700, color: "#111827", marginBottom: 8 }}>
                   {activeTab === "settings" && "Settings"}
                 </h3>
-                <p style={{ color: "#6b7280" }}>Coming soon...</p>
+                <p style={{ color: "#374151" }}>Coming soon...</p>
               </div>
             </div>
           )}

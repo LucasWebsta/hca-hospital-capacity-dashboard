@@ -35,12 +35,14 @@ export function MetricCard({
 
   return (
     <div style={{
-      background: '#fff',
+      background: 'rgba(255,255,255,0.65)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
       borderRadius: 12,
       padding: '16px 18px 18px',
-      border: '1px solid #edf0f5',
+      border: '1px solid rgba(255,255,255,0.65)',
       flex: 1,
-      boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       position: 'relative',
       overflow: 'hidden',
     }}>
@@ -53,12 +55,12 @@ export function MetricCard({
         borderRadius: '12px 12px 0 0',
       }} />
 
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#4b5563', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' as const }}>
         {title}
       </div>
 
       {isAlert ? (
-        <div>
+        <div key={String(value)} className="metric-value-enter">
           {(() => {
             const riskVal = String(value);
             const isHigh = riskVal === 'High';
@@ -89,19 +91,19 @@ export function MetricCard({
                   }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                  <span style={{ fontSize: 10, color: '#9ca3af' }}>Low</span>
+                  <span style={{ fontSize: 10, color: '#4b5563' }}>Low</span>
                   <span style={{ fontSize: 10, color: riskColor, fontWeight: 600 }}>{barWidth}</span>
-                  <span style={{ fontSize: 10, color: '#9ca3af' }}>Critical</span>
+                  <span style={{ fontSize: 10, color: '#4b5563' }}>Critical</span>
                 </div>
               </>
             );
           })()}
         </div>
       ) : (
-        <div>
+        <div key={String(value)} className="metric-value-enter">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' as const }}>
             <span style={{ fontSize: 28, fontWeight: 800, color: BRAND_BLUE, lineHeight: 1, letterSpacing: -0.5 }}>{value}</span>
-            {unit && <span style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>/{unit}</span>}
+            {unit && <span style={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>/{unit}</span>}
           </div>
 
           {change && (
@@ -128,7 +130,7 @@ export function MetricCard({
           )}
 
           {subtext && (
-            <div style={{ fontSize: 11, color: '#94a3b8', marginTop: progressBar ? 5 : 8, fontWeight: 500 }}>{subtext}</div>
+            <div style={{ fontSize: 11, color: '#475569', marginTop: progressBar ? 5 : 8, fontWeight: 500 }}>{subtext}</div>
           )}
         </div>
       )}
@@ -138,7 +140,7 @@ export function MetricCard({
           marginTop: 8,
           fontSize: 11.5,
           lineHeight: 1.4,
-          color: '#64748b',
+          color: '#374151',
           fontWeight: 500,
         }}>
           {tooltip}

@@ -41,7 +41,7 @@ export function OccupancyTrendChart({ days = 30, facilityId, tooltipsOn = true }
   const valueLabel = activeSeries === 'Overall' ? 'current census' : 'ICU beds in use';
 
   return (
-    <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
+    <div style={{ background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)', padding: '20px 22px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
 
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -52,16 +52,16 @@ export function OccupancyTrendChart({ days = 30, facilityId, tooltipsOn = true }
               <InfoTooltip text="Historical census over time. Switch between Overall (total beds) and ICU to see capacity trends. One snapshot per day per facility is used to avoid double-counting." />
             )}
           </div>
-          <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>
+          <div style={{ fontSize: 11.5, color: '#475569', marginTop: 2 }}>{subtitle}</div>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, background: '#f8fafc', borderRadius: 8, padding: 3, border: '1px solid #edf0f5' }}>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(0,0,0,0.06)', borderRadius: 8, padding: 3, border: '1px solid rgba(0,0,0,0.10)' }}>
           {(['Overall', 'ICU'] as Series[]).map(s => (
             <button key={s} onClick={() => setActiveSeries(s)} style={{
               fontSize: 11.5, fontWeight: 600, padding: '4px 12px', borderRadius: 6,
               border: 'none', cursor: 'pointer',
               background: activeSeries === s ? BRAND_BLUE : 'transparent',
-              color: activeSeries === s ? '#fff' : '#94a3b8',
+              color: activeSeries === s ? '#fff' : '#475569',
               boxShadow: activeSeries === s ? '0 1px 4px rgba(9,34,64,0.2)' : 'none',
             }}>{s}</button>
           ))}
@@ -72,19 +72,19 @@ export function OccupancyTrendChart({ days = 30, facilityId, tooltipsOn = true }
       <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <div style={{ width: 20, height: 2.5, background: BRAND_BLUE, borderRadius: 2 }} />
-          <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 500 }}>
+          <span style={{ fontSize: 11, color: '#374151', fontWeight: 500 }}>
             {activeSeries === 'Overall' ? 'Actual Census' : 'ICU in use'}
           </span>
         </div>
         <div style={{ marginLeft: 'auto' }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_BLUE }}>{lastActual?.actual?.toLocaleString() ?? '—'}</span>
-          <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>{valueLabel}</span>
+          <span style={{ fontSize: 10.5, color: '#475569', marginLeft: 4 }}>{valueLabel}</span>
           {lastActual?.occupancy_pct != null && (
             <>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_ORANGE, marginLeft: 8 }}>
                 {lastActual.occupancy_pct}%
               </span>
-              <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>occupancy</span>
+              <span style={{ fontSize: 10.5, color: '#475569', marginLeft: 4 }}>occupancy</span>
             </>
           )}
         </div>
@@ -92,11 +92,11 @@ export function OccupancyTrendChart({ days = 30, facilityId, tooltipsOn = true }
 
       <ResponsiveContainer width="100%" height={175}>
         {loadError ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#475569', fontSize: 12 }}>
             {loadError}
           </div>
         ) : data.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#94a3b8', fontSize: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#475569', fontSize: 12 }}>
             No {activeSeries === 'ICU' ? 'ICU' : 'overall'} data for this period
           </div>
         ) : (
@@ -112,10 +112,10 @@ export function OccupancyTrendChart({ days = 30, facilityId, tooltipsOn = true }
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="4 4" stroke="#f1f5f9" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v} />
+            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 10, fill: '#475569' }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(1)}k` : v} />
             <Tooltip
-              contentStyle={{ fontSize: 11.5, borderRadius: 8, border: '1px solid #edf0f5', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+              contentStyle={{ fontSize: 11.5, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
               itemStyle={{ color: '#374151' }}
               labelStyle={{ fontWeight: 600, color: BRAND_BLUE }}
             />

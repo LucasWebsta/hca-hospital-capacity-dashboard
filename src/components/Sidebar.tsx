@@ -1,8 +1,7 @@
 import { Bell, FileText, Home, Activity } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
-// HCA Brand colors: Blue #092240 | Orange #E75925
-const BRAND_BLUE = '#092240';
+// HCA Brand colors: Orange #E75925
 const BRAND_ORANGE = '#E75925';
 
 interface SidebarProps {
@@ -35,9 +34,11 @@ export function Sidebar({ activeTab, onTabChange, facilityName, isOpen = true, o
   return (
     <div style={{
       width: 224, minWidth: 224,
-      background: `linear-gradient(170deg, #061525 0%, ${BRAND_BLUE} 50%, #0d2d54 100%)`,
+      background: 'rgba(6,21,37,0.82)',
+      backdropFilter: 'blur(4px)',
+      WebkitBackdropFilter: 'blur(4px)',
       color: '#fff', display: 'flex', flexDirection: 'column', height: '100vh',
-      boxShadow: '2px 0 20px rgba(6,21,37,0.35)',
+      boxShadow: '2px 0 32px rgba(0,0,0,0.4)',
       position: isMobile ? 'fixed' : 'relative',
       left: isMobile ? (isOpen ? 0 : -224) : 0,
       zIndex: 999,
