@@ -36,6 +36,7 @@ export interface CensusMetrics {
 }
 
 export interface Facility {
+  facility_id: number;
   name: string;
   census: number;
   occupancy: number;
@@ -45,6 +46,7 @@ export interface Facility {
 
 export interface Alert {
   id: number;
+  hospital_id?: number;
   hospital: string;
   severity: 'HIGH' | 'MEDIUM' | 'LOW' | 'OK';
   message: string;

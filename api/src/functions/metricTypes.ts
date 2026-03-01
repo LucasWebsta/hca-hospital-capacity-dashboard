@@ -1,25 +1,16 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import { getDb } from '../db';
 
-// GET /api/metricTypes — distinct metric values from facility_metrics (for alerts dropdown)
+// GET /api/metricTypes — metric column names from facility_metrics_wide (for alerts dropdown)
 export async function metricTypesHandler(
   _request: HttpRequest,
-  context: InvocationContext
+  _context: InvocationContext
 ): Promise<HttpResponseInit> {
-  try {
-    const db = getDb();
-    const { rows } = await db.query(`
-      SELECT DISTINCT metric FROM facility_metrics ORDER BY metric
-    `);
-    const metrics = rows.map((r) => r.metric);
-    return {
-      jsonBody: metrics,
-      headers: { 'Access-Control-Allow-Origin': '*' },
-    };
-  } catch (err) {
-    context.error('metricTypes query failed', err);
-    return { status: 500, jsonBody: { error: 'Internal server error' } };
-  }
+  // Metrics are fixed columns in facility_metrics_wide — return the canonical display names
+  const metrics = ['Admissions', 'Births', 'Discharges', 'ICU Occupancy', 'Total Census'];
+  return {
+    jsonBody: metrics,
+    headers: { 'Access-Control-Allow-Origin': '*' },
+  };
 }
 
 app.http('metricTypes', { methods: ['GET'], authLevel: 'anonymous', handler: metricTypesHandler });

@@ -4,9 +4,9 @@
  *
  * Schema:
  *   facilities(id, name, capacity, region, facility_id)
- *   facility_metrics(id, facility_id, metric, source_update_date, metric_value)
- *     metrics: 'Total Census', 'Admissions', 'Discharges', 'Births', 'ICU Occupancy'
- *     facility_metrics.facility_id -> facilities.facility_id
+ *   facility_metrics_wide(facility_id, update_utc, admissions, discharges, births, icu_occupancy, total_census, metrics, created_at)
+ *     PK: (facility_id, update_utc)
+ *     facility_metrics_wide.facility_id -> facilities.facility_id
  *   forecast_data(id, hospital_id, forecast_date, predicted_census, confidence_lower, confidence_upper)
  *   alerts(id, hospital_id, severity, message, is_active, triggered_at, resolved_at)
  */
@@ -42,33 +42,41 @@ function readBody(req) {
   });
 }
 
+// helper: map metric display name to facility_metrics_wide column
+function metricToColumn(metric) {
+  const m = (metric || '').toLowerCase();
+  if (m.includes('admiss'))  return 'admissions';
+  if (m.includes('discharg')) return 'discharges';
+  if (m.includes('birth'))   return 'births';
+  if (m.includes('icu'))     return 'icu_occupancy';
+  return 'total_census';
+}
+
 // ── /api/census ──────────────────────────────────────────────────────────────
 async function handleCensus(res, facilityId = null) {
   if (facilityId) {
     const { rows } = await pool.query(`
-      SELECT DISTINCT ON (fm.facility_id)
-        fm.metric_value::int AS "totalCensus",
+      SELECT DISTINCT ON (fw.facility_id)
+        fw.total_census::int AS "totalCensus",
         f.capacity::int      AS "totalCapacity",
-        ROUND((fm.metric_value::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS "occupancyRate",
-        ROUND(fm.metric_value * 1.015)::int AS "sevenDayForecast"
-      FROM facility_metrics fm
-      JOIN facilities f ON f.facility_id = fm.facility_id
-      WHERE fm.facility_id = $1
-        AND LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-      ORDER BY fm.facility_id, fm.source_update_date DESC
+        ROUND((fw.total_census::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS "occupancyRate",
+        ROUND(fw.total_census * 1.015)::int AS "sevenDayForecast"
+      FROM facility_metrics_wide fw
+      JOIN facilities f ON f.facility_id = fw.facility_id
+      WHERE fw.facility_id = $1
+      ORDER BY fw.facility_id, fw.update_utc DESC
     `, [facilityId]);
     return json(res, rows[0] ?? {});
   }
   const { rows } = await pool.query(`
     WITH latest_per_facility AS (
-      SELECT DISTINCT ON (fm.facility_id)
-        fm.facility_id,
-        fm.metric_value AS total_census,
+      SELECT DISTINCT ON (fw.facility_id)
+        fw.facility_id,
+        fw.total_census,
         f.capacity
-      FROM facility_metrics fm
-      JOIN facilities f ON f.facility_id = fm.facility_id
-      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-      ORDER BY fm.facility_id, fm.source_update_date DESC
+      FROM facility_metrics_wide fw
+      JOIN facilities f ON f.facility_id = fw.facility_id
+      ORDER BY fw.facility_id, fw.update_utc DESC
     ),
     totals AS (
       SELECT
@@ -104,22 +112,21 @@ async function handleFacilitiesList(res) {
 async function handleFacilities(res, facilityId = null) {
   const { rows } = await pool.query(`
     WITH latest AS (
-      SELECT DISTINCT ON (fm.facility_id)
-        fm.facility_id, fm.metric_value AS census, fm.source_update_date AS latest_ts
-      FROM facility_metrics fm
-      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-      ORDER BY fm.facility_id, fm.source_update_date DESC
+      SELECT DISTINCT ON (fw.facility_id)
+        fw.facility_id, fw.total_census AS census, fw.update_utc AS latest_ts
+      FROM facility_metrics_wide fw
+      ORDER BY fw.facility_id, fw.update_utc DESC
     ),
     day_ago AS (
-      SELECT DISTINCT ON (fm.facility_id)
-        fm.facility_id, fm.metric_value AS prev_census
-      FROM facility_metrics fm
-      JOIN latest l ON l.facility_id = fm.facility_id
-      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-        AND fm.source_update_date <= l.latest_ts - INTERVAL '24 hours'
-      ORDER BY fm.facility_id, fm.source_update_date DESC
+      SELECT DISTINCT ON (fw.facility_id)
+        fw.facility_id, fw.total_census AS prev_census
+      FROM facility_metrics_wide fw
+      JOIN latest l ON l.facility_id = fw.facility_id
+      WHERE fw.update_utc <= l.latest_ts - INTERVAL '24 hours'
+      ORDER BY fw.facility_id, fw.update_utc DESC
     )
     SELECT
+      f.facility_id,
       f.name,
       l.census::int                                                        AS census,
       ROUND((l.census::numeric / NULLIF(f.capacity, 0)) * 100, 1)         AS occupancy,
@@ -143,11 +150,10 @@ async function handleAlerts(res, userId = null) {
   // 1. System-level threshold alerts
   const { rows: systemRows } = await pool.query(`
     WITH latest AS (
-      SELECT DISTINCT ON (fm.facility_id)
-        fm.facility_id, fm.metric_value AS census
-      FROM facility_metrics fm
-      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-      ORDER BY fm.facility_id, fm.source_update_date DESC
+      SELECT DISTINCT ON (fw.facility_id)
+        fw.facility_id, fw.total_census AS census
+      FROM facility_metrics_wide fw
+      ORDER BY fw.facility_id, fw.update_utc DESC
     ),
     occ AS (
       SELECT
@@ -159,6 +165,7 @@ async function handleAlerts(res, userId = null) {
     )
     SELECT
       id,
+      id AS hospital_id,
       name AS hospital,
       CASE
         WHEN occupancy_pct >= 95 THEN 'HIGH'
@@ -194,24 +201,25 @@ async function handleAlerts(res, userId = null) {
       try {
         if (rule.condition_type === 'percent_occupancy' && rule.threshold_pct != null) {
           const { rows: mv } = await pool.query(
-            `SELECT metric_value FROM facility_metrics
-             WHERE facility_id = $1 AND LOWER(metric) IN ('total census','total','census','total beds','occupied','beds')
-             ORDER BY source_update_date DESC LIMIT 1`, [rule.facility_id]
+            `SELECT total_census AS metric_value FROM facility_metrics_wide
+             WHERE facility_id = $1
+             ORDER BY update_utc DESC LIMIT 1`, [rule.facility_id]
           );
           if (mv.length > 0) {
             const pct = rule.capacity > 0 ? (mv[0].metric_value / rule.capacity) * 100 : 0;
             if (pct >= Number(rule.threshold_pct)) {
-              userRows.push({ id: rule.id * -1, hospital: rule.facility_name,
+              userRows.push({ id: rule.id * -1, hospital_id: rule.facility_id, hospital: rule.facility_name,
                 severity: pct >= 95 ? 'HIGH' : pct >= 85 ? 'MEDIUM' : 'LOW',
                 message: `[Your rule] ${rule.facility_name} ${rule.metric} occupancy at ${pct.toFixed(1)}% (threshold: ${rule.threshold_pct}%)`,
                 triggered_at: new Date().toISOString(), is_active: true, source: 'user_rule' });
             }
           }
         } else if (rule.condition_type === 'value_threshold' && rule.operator && rule.value_number != null) {
+          const col = metricToColumn(rule.metric);
           const { rows: mv } = await pool.query(
-            `SELECT metric_value FROM facility_metrics
-             WHERE facility_id = $1 AND LOWER(metric) = LOWER($2)
-             ORDER BY source_update_date DESC LIMIT 1`, [rule.facility_id, rule.metric]
+            `SELECT ${col} AS metric_value FROM facility_metrics_wide
+             WHERE facility_id = $1
+             ORDER BY update_utc DESC LIMIT 1`, [rule.facility_id]
           );
           if (mv.length > 0) {
             const val = Number(mv[0].metric_value);
@@ -219,24 +227,25 @@ async function handleAlerts(res, userId = null) {
             const triggered = (rule.operator === '>' && val > thr) || (rule.operator === '>=' && val >= thr) ||
                               (rule.operator === '<' && val < thr) || (rule.operator === '<=' && val <= thr);
             if (triggered) {
-              userRows.push({ id: rule.id * -1, hospital: rule.facility_name,
+              userRows.push({ id: rule.id * -1, hospital_id: rule.facility_id, hospital: rule.facility_name,
                 severity: 'MEDIUM',
                 message: `[Your rule] ${rule.facility_name} ${rule.metric} is ${val} (${rule.operator} ${thr})`,
                 triggered_at: new Date().toISOString(), is_active: true, source: 'user_rule' });
             }
           }
         } else if (rule.condition_type === 'surge_trend') {
+          const col = metricToColumn(rule.metric);
           const { rows: mv } = await pool.query(
-            `SELECT metric_value FROM facility_metrics
-             WHERE facility_id = $1 AND LOWER(metric) = LOWER($2)
-             ORDER BY source_update_date DESC LIMIT 2`, [rule.facility_id, rule.metric]
+            `SELECT ${col} AS metric_value FROM facility_metrics_wide
+             WHERE facility_id = $1
+             ORDER BY update_utc DESC LIMIT 2`, [rule.facility_id]
           );
           if (mv.length >= 2) {
             const latest = Number(mv[0].metric_value);
             const prev   = Number(mv[1].metric_value);
             const changePct = prev > 0 ? ((latest - prev) / prev) * 100 : 0;
             if (changePct >= 5) {
-              userRows.push({ id: rule.id * -1, hospital: rule.facility_name,
+              userRows.push({ id: rule.id * -1, hospital_id: rule.facility_id, hospital: rule.facility_name,
                 severity: changePct >= 15 ? 'HIGH' : 'MEDIUM',
                 message: `[Your rule] ${rule.facility_name} ${rule.metric} surged ${changePct.toFixed(1)}% recently`,
                 triggered_at: new Date().toISOString(), is_active: true, source: 'user_rule' });
@@ -295,18 +304,16 @@ async function handleTrend(res, days = 30, facilityId = null) {
     const { rows } = await pool.query(`
       WITH daily AS (
         SELECT
-          DATE(source_update_date)  AS d,
-          AVG(fm.metric_value)::int AS total_census,
+          DATE(fw.update_utc)       AS d,
+          AVG(fw.total_census)::int AS total_census,
           MAX(f.capacity)           AS capacity
-        FROM facility_metrics fm
-        JOIN facilities f ON f.facility_id = fm.facility_id
-        WHERE fm.facility_id = $2
-          AND LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-          AND fm.source_update_date >= (
-            SELECT MAX(source_update_date) FROM facility_metrics
-            WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+        FROM facility_metrics_wide fw
+        JOIN facilities f ON f.facility_id = fw.facility_id
+        WHERE fw.facility_id = $2
+          AND fw.update_utc >= (
+            SELECT MAX(update_utc) FROM facility_metrics_wide
           ) - ($1 || ' days')::INTERVAL
-        GROUP BY DATE(source_update_date)
+        GROUP BY DATE(fw.update_utc)
       )
       SELECT
         TO_CHAR(d, 'Mon DD') AS date,
@@ -326,14 +333,13 @@ async function handleTrend(res, days = 30, facilityId = null) {
       FROM (
         SELECT
           facility_id,
-          DATE(source_update_date) AS d,
-          AVG(metric_value)        AS avg_by_fac
-        FROM facility_metrics
-        WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-          AND source_update_date >= (
-            SELECT MAX(source_update_date) FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          DATE(update_utc) AS d,
+          AVG(total_census) AS avg_by_fac
+        FROM facility_metrics_wide
+        WHERE update_utc >= (
+            SELECT MAX(update_utc) FROM facility_metrics_wide
           ) - ($1 || ' days')::INTERVAL
-        GROUP BY facility_id, DATE(source_update_date)
+        GROUP BY facility_id, DATE(update_utc)
       ) sub
       GROUP BY d
     ),

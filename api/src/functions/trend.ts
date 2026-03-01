@@ -10,17 +10,16 @@ export async function trendHandler(
     const days = parseInt(request.query.get('days') ?? '30', 10);
     const db = getDb();
 
-    // facility_metrics: group by date (metric='total'), sum metric_value
+    // facility_metrics_wide: group by date, sum total_census across all facilities
     const actuals = await db.query(
       `SELECT
-         TO_CHAR((source_update_date AT TIME ZONE 'UTC')::date, 'Mon DD') AS date,
-         SUM(metric_value)::int AS actual
-       FROM facility_metrics
-       WHERE LOWER(metric) IN ('total census', 'total')
-         AND (source_update_date AT TIME ZONE 'UTC')::date >=
-             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - ($1 || ' days')::INTERVAL
-       GROUP BY (source_update_date AT TIME ZONE 'UTC')::date
-       ORDER BY (source_update_date AT TIME ZONE 'UTC')::date ASC`,
+         TO_CHAR((update_utc AT TIME ZONE 'UTC')::date, 'Mon DD') AS date,
+         SUM(total_census)::int AS actual
+       FROM facility_metrics_wide
+       WHERE (update_utc AT TIME ZONE 'UTC')::date >=
+             (SELECT (MAX(update_utc) AT TIME ZONE 'UTC')::date FROM facility_metrics_wide) - ($1 || ' days')::INTERVAL
+       GROUP BY (update_utc AT TIME ZONE 'UTC')::date
+       ORDER BY (update_utc AT TIME ZONE 'UTC')::date ASC`,
       [days]
     );
 

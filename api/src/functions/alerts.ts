@@ -1,6 +1,16 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { getDb } from '../db';
 
+// Map metric display name → facility_metrics_wide column
+function metricToColumn(metric: string): string {
+  const m = (metric || '').toLowerCase();
+  if (m.includes('admiss'))   return 'admissions';
+  if (m.includes('discharg')) return 'discharges';
+  if (m.includes('birth'))    return 'births';
+  if (m.includes('icu'))      return 'icu_occupancy';
+  return 'total_census';
+}
+
 // GET /api/alerts
 // Returns system-level threshold alerts (occupancy ≥ 75%) PLUS any user-defined
 // alert rules (from alert_rules table) that are currently triggered against the
@@ -15,27 +25,21 @@ export async function alertsHandler(
 
     // ── 1. System-level threshold alerts from occupancy ──────────────────────
     const { rows: systemRows } = await db.query(`
-      WITH latest_per_facility AS (
-        SELECT facility_id, MAX(source_update_date) AS max_ts
-        FROM facility_metrics
-        WHERE LOWER(metric) IN ('total census', 'total')
-        GROUP BY facility_id
-      ),
-      latest_vals AS (
-        SELECT fm.facility_id, fm.metric_value
-        FROM facility_metrics fm
-        JOIN latest_per_facility l ON fm.facility_id = l.facility_id
-          AND fm.source_update_date = l.max_ts AND LOWER(fm.metric) IN ('total census', 'total')
+      WITH latest AS (
+        SELECT DISTINCT ON (facility_id)
+          facility_id, total_census AS census
+        FROM facility_metrics_wide
+        ORDER BY facility_id, update_utc DESC
       ),
       occ AS (
         SELECT
           f.facility_id AS id,
           f.name,
-          COALESCE(lv.metric_value, 0)                                               AS census,
+          COALESCE(l.census, 0)                                                        AS census,
           f.capacity,
-          ROUND((COALESCE(lv.metric_value, 0)::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS occupancy_pct
+          ROUND((COALESCE(l.census, 0)::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS occupancy_pct
         FROM facilities f
-        LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
+        LEFT JOIN latest l ON f.facility_id = l.facility_id
       )
       SELECT
         id,
@@ -80,9 +84,9 @@ export async function alertsHandler(
           if (rule.condition_type === 'percent_occupancy' && rule.threshold_pct != null) {
             // Get latest total census for this facility
             const { rows: mv } = await db.query(
-              `SELECT metric_value FROM facility_metrics
-               WHERE facility_id = $1 AND LOWER(metric) IN ('total census', 'total')
-               ORDER BY source_update_date DESC LIMIT 1`,
+              `SELECT total_census AS metric_value FROM facility_metrics_wide
+               WHERE facility_id = $1
+               ORDER BY update_utc DESC LIMIT 1`,
               [rule.facility_id]
             );
             if (mv.length > 0) {
@@ -100,12 +104,13 @@ export async function alertsHandler(
               }
             }
           } else if (rule.condition_type === 'value_threshold' && rule.operator && rule.value_number != null) {
-            // Get latest value for this facility + metric
+            // Get latest value for this facility + metric (map display name to column)
+            const col = metricToColumn(rule.metric as string);
             const { rows: mv } = await db.query(
-              `SELECT metric_value FROM facility_metrics
-               WHERE facility_id = $1 AND LOWER(metric) = LOWER($2)
-               ORDER BY source_update_date DESC LIMIT 1`,
-              [rule.facility_id, rule.metric]
+              `SELECT ${col} AS metric_value FROM facility_metrics_wide
+               WHERE facility_id = $1
+               ORDER BY update_utc DESC LIMIT 1`,
+              [rule.facility_id]
             );
             if (mv.length > 0) {
               const val = Number(mv[0].metric_value);
@@ -128,12 +133,13 @@ export async function alertsHandler(
               }
             }
           } else if (rule.condition_type === 'surge_trend' && rule.window_minutes != null) {
-            // Compare current value to value window_minutes ago
+            // Compare latest two readings for surge detection
+            const surgeCol = metricToColumn(rule.metric as string);
             const { rows: mv } = await db.query(
-              `SELECT metric_value, source_update_date FROM facility_metrics
-               WHERE facility_id = $1 AND LOWER(metric) = LOWER($2)
-               ORDER BY source_update_date DESC LIMIT 2`,
-              [rule.facility_id, rule.metric]
+              `SELECT ${surgeCol} AS metric_value FROM facility_metrics_wide
+               WHERE facility_id = $1
+               ORDER BY update_utc DESC LIMIT 2`,
+              [rule.facility_id]
             );
             if (mv.length >= 2) {
               const latest = Number(mv[0].metric_value);

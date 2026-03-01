@@ -10,14 +10,13 @@ export async function forecastHandler(
     const days = parseInt(request.query.get('days') ?? '7', 10);
     const db = getDb();
 
-    // facility_metrics (metric='total') by date for trend-based forecast
+    // facility_metrics_wide: sum total_census by date for trend-based forecast
     const { rows: recent } = await db.query(`
-      SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
-      FROM   facility_metrics
-      WHERE  LOWER(metric) IN ('total census', 'total')
-        AND  (source_update_date AT TIME ZONE 'UTC')::date >=
-             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - INTERVAL '14 days'
-      GROUP  BY (source_update_date AT TIME ZONE 'UTC')::date
+      SELECT (update_utc AT TIME ZONE 'UTC')::date AS census_date, SUM(total_census)::int AS total
+      FROM   facility_metrics_wide
+      WHERE  (update_utc AT TIME ZONE 'UTC')::date >=
+             (SELECT (MAX(update_utc) AT TIME ZONE 'UTC')::date FROM facility_metrics_wide) - INTERVAL '14 days'
+      GROUP  BY (update_utc AT TIME ZONE 'UTC')::date
       ORDER  BY census_date ASC
     `);
 

@@ -59,28 +59,43 @@ export function MetricCard({
 
       {isAlert ? (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: '#fdf0ec',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <AlertTriangle size={16} color={BRAND_ORANGE} />
-            </div>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#c04a1a' }}>Moderate</span>
-          </div>
-          <div style={{ width: '100%', height: 4, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%', width: '65%',
-              background: BRAND_ORANGE,
-              borderRadius: 4,
-            }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>Low</span>
-            <span style={{ fontSize: 10, color: BRAND_ORANGE, fontWeight: 600 }}>65%</span>
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>Critical</span>
-          </div>
+          {(() => {
+            const riskVal = String(value);
+            const isHigh = riskVal === 'High';
+            const isNormal = riskVal === 'Normal';
+            const riskColor = isHigh ? '#dc2626' : isNormal ? '#16a34a' : BRAND_ORANGE;
+            const riskIconBg = isHigh ? '#fde8e8' : isNormal ? '#f0fdf4' : '#fdf0ec';
+            const riskTextColor = isHigh ? '#991b1b' : isNormal ? '#15803d' : '#c04a1a';
+            const barWidth = progressBar ?? '65%';
+            return (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: riskIconBg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <AlertTriangle size={16} color={riskColor} />
+                  </div>
+                  <span style={{ fontSize: 22, fontWeight: 700, color: riskTextColor }}>{riskVal}</span>
+                </div>
+                <div style={{ width: '100%', height: 4, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%',
+                    width: barWidth,
+                    maxWidth: '100%',
+                    background: riskColor,
+                    borderRadius: 4,
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                  <span style={{ fontSize: 10, color: '#9ca3af' }}>Low</span>
+                  <span style={{ fontSize: 10, color: riskColor, fontWeight: 600 }}>{barWidth}</span>
+                  <span style={{ fontSize: 10, color: '#9ca3af' }}>Critical</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
       ) : (
         <div>

@@ -5,5 +5,7 @@ export { OccupancyTrendChart } from './OccupancyTrendChart';
 export { ForecastOccupancyChart } from './ForecastOccupancyChart';
 export { FacilitiesAtRisk } from './FacilitiesAtRisk';
 export { AlertsPanel } from './AlertsPanel';
+export { AlertsWidget } from './AlertsWidget';
 export { ReportsPanel } from './ReportsPanel';
 export { InfoTooltip } from './InfoTooltip';
+export { FacilityMap } from './FacilityMap';
