@@ -321,72 +321,239 @@ async function handleUsersGet(res) {
 async function handleUsersPost(res, body) {
   const { firstName, lastName, email, role, password } = body;
   
+  // Validate required fields
   if (!firstName || !lastName || !email || !role || !password) {
     json(res, { error: 'All fields are required' }, 400);
     return;
   }
   
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    json(res, { error: 'Invalid email format' }, 400);
+    return;
+  }
+  
+  // Validate password length
+  if (password.length < 6) {
+    json(res, { error: 'Password must be at least 6 characters long' }, 400);
+    return;
+  }
+  
   try {
     // Check if email already exists
-    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
     if (existing.rows.length > 0) {
       json(res, { error: 'User with this email already exists' }, 409);
       return;
     }
     
-    // Try to insert with status column, fallback without it
-    let rows;
+    // Get actual role values from database to validate and handle enum type
+    let roleValue = role.trim();
+    let validEnumRoles = [];
     try {
-      const result = await pool.query(`
-        INSERT INTO users (first_name, last_name, email, password_hash, role, status)
-        VALUES ($1, $2, $3, $4, $5, 'Active')
-        RETURNING id, first_name, last_name, email, role
-      `, [firstName, lastName, email.toLowerCase(), password, role]);
-      rows = result.rows;
-    } catch (err) {
-      if (err.message.includes('column') && err.message.includes('status')) {
-        // Status column doesn't exist, insert without it
-        const result = await pool.query(`
-          INSERT INTO users (first_name, last_name, email, password_hash, role)
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING id, first_name, last_name, email, role
-        `, [firstName, lastName, email.toLowerCase(), password, role]);
-        rows = result.rows;
+      // First, try to get enum values if it's an enum type
+      const enumResult = await pool.query(`
+        SELECT enumlabel 
+        FROM pg_enum 
+        WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_role')
+        ORDER BY enumsortorder
+      `);
+      if (enumResult.rows.length > 0) {
+        validEnumRoles = enumResult.rows.map(r => r.enumlabel);
+        console.log(`[ADD USER] Found enum type with values:`, validEnumRoles);
+        
+        // Validate role against enum values
+        if (!validEnumRoles.includes(roleValue)) {
+          json(res, { 
+            error: `Invalid role "${roleValue}". Valid roles are: ${validEnumRoles.join(', ')}`,
+            validRoles: validEnumRoles,
+            receivedRole: roleValue
+          }, 400);
+          return;
+        }
+        
+        // Role is valid, use it as-is
+        console.log(`[ADD USER] Role "${roleValue}" is valid`);
       } else {
+        // Not an enum type, check existing roles to see format
+        const roleCheck = await pool.query('SELECT DISTINCT role FROM users LIMIT 10');
+        if (roleCheck.rows.length > 0) {
+          const existingRoles = roleCheck.rows.map(r => r.role);
+          console.log(`[ADD USER] Existing roles in DB (not enum):`, existingRoles);
+          // Use the role as-is - let database constraints handle validation
+        }
+      }
+    } catch (err) {
+      console.warn(`[ADD USER] Could not check role format: ${err.message}`);
+      // Continue with original role value - let database handle validation
+    }
+    
+    // Insert user - handle various column combinations
+    // home_facility_id is now nullable (represents "all facilities" when NULL)
+    let rows;
+    let hasStatusColumn = true;
+    
+    // Use NULL for home_facility_id (represents "all facilities" access)
+    // After running make_home_facility_nullable.sql, this will work
+    const facilityId = null;
+    
+    console.log(`[ADD USER] Using NULL for home_facility_id (all facilities access)`);
+    
+    // Now insert the user with NULL for home_facility_id
+    try {
+      // Try with status column and home_facility_id (NULL)
+      const result = await pool.query(`
+        INSERT INTO users (first_name, last_name, email, password_hash, role, status, home_facility_id)
+        VALUES ($1, $2, $3, $4, $5, 'Active', NULL)
+        RETURNING id, first_name, last_name, email, role, status
+      `, [firstName.trim(), lastName.trim(), email.toLowerCase().trim(), password, roleValue]);
+      rows = result.rows;
+      console.log(`[ADD USER] Inserted with status column and NULL facility_id (all facilities)`);
+    } catch (err) {
+      // Handle other errors (like missing status column)
+      if (err.message.includes('column') && (err.message.includes('status') || err.message.includes('does not exist'))) {
+        // Status column doesn't exist, try without it
+        console.log(`[ADD USER] Status column not found, trying without it: ${err.message}`);
+        hasStatusColumn = false;
+        try {
+          // Try without status column, still use NULL for home_facility_id
+          const result = await pool.query(`
+            INSERT INTO users (first_name, last_name, email, password_hash, role, home_facility_id)
+            VALUES ($1, $2, $3, $4, $5, NULL)
+            RETURNING id, first_name, last_name, email, role
+          `, [firstName.trim(), lastName.trim(), email.toLowerCase().trim(), password, roleValue]);
+          rows = result.rows;
+          console.log(`[ADD USER] Inserted without status column, with NULL facility_id (all facilities)`);
+        } catch (err2) {
+          // If home_facility_id column doesn't exist either, try without it
+          if (err2.message.includes('home_facility_id') || err2.message.includes('does not exist')) {
+            try {
+              const result = await pool.query(`
+                INSERT INTO users (first_name, last_name, email, password_hash, role)
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING id, first_name, last_name, email, role
+              `, [firstName.trim(), lastName.trim(), email.toLowerCase().trim(), password, roleValue]);
+              rows = result.rows;
+              console.log(`[ADD USER] Inserted without status and home_facility_id columns`);
+            } catch (err3) {
+              console.error(`[ADD USER] Insert failed: ${err3.message}`);
+              throw err3;
+            }
+          } else {
+            console.error(`[ADD USER] Insert without status failed: ${err2.message}`);
+            throw err2;
+          }
+        }
+      } else if (err.message.includes('enum') || err.message.includes('invalid input')) {
+        // Role enum issue - return helpful error with valid values
+        if (validEnumRoles.length > 0) {
+          json(res, { 
+            error: `Invalid role "${role}". Valid roles are: ${validEnumRoles.join(', ')}`,
+            validRoles: validEnumRoles,
+            receivedRole: role
+          }, 400);
+          return;
+        } else {
+          // Try to get enum values now
+          try {
+            const enumQuery = await pool.query(`
+              SELECT enumlabel 
+              FROM pg_enum 
+              WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_role')
+              ORDER BY enumsortorder
+            `);
+            if (enumQuery.rows.length > 0) {
+              const validRoles = enumQuery.rows.map(r => r.enumlabel);
+              console.log(`[ADD USER] Valid enum roles:`, validRoles);
+              json(res, { 
+                error: `Invalid role "${role}". Valid roles are: ${validRoles.join(', ')}`,
+                validRoles: validRoles,
+                receivedRole: role
+              }, 400);
+              return;
+            }
+          } catch (enumErr) {
+            console.warn(`[ADD USER] Could not query enum: ${enumErr.message}`);
+          }
+          // If we can't get enum values, return generic error
+          json(res, { 
+            error: `Invalid role value. Please check the database for valid role values.`,
+            receivedRole: role
+          }, 400);
+          return;
+        }
+      } else {
+        // Some other error occurred
+        console.error(`[ADD USER] Insert error: ${err.message}`, err);
         throw err;
       }
     }
     
+    // If rows is still not set, something went wrong
+    if (!rows) {
+      json(res, { 
+        error: 'Failed to create user. Please check server logs for details.',
+        details: 'User insertion failed after all attempts'
+      }, 500);
+      return;
+    }
+    
     const newUser = rows[0];
+    console.log(`[ADD USER] Created user: ${newUser.first_name} ${newUser.last_name} (${newUser.email})`);
     
     // Log user creation (if activity_logs table exists)
     try {
       await pool.query(`
         INSERT INTO activity_logs (user_id, user_name, action)
         VALUES ($1, $2, 'user_added')
-      `, [newUser.id, `${firstName} ${lastName}`]);
+      `, [newUser.id, `${firstName.trim()} ${lastName.trim()}`]);
     } catch (err) {
       // Activity logs table might not exist, that's okay
       console.warn('Could not log user creation:', err.message);
     }
     
-    json(res, {
-      id: newUser.id,
+    // Return the created user
+    const responseData = {
+      id: String(newUser.id),
       firstName: newUser.first_name,
       lastName: newUser.last_name,
       email: newUser.email,
       role: newUser.role,
-      status: 'Active',
-    }, 201);
+      status: (hasStatusColumn && newUser.status) ? newUser.status : 'Active',
+      createdAt: new Date().toISOString(),
+    };
+    
+    console.log(`[ADD USER] Successfully created user:`, responseData);
+    json(res, responseData, 201);
   } catch (err) {
-    console.error('Add user error:', err);
-    json(res, { error: 'Internal server error' }, 500);
+    console.error('[ADD USER] Error details:', {
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+      detail: err.detail
+    });
+    json(res, { 
+      error: err.message || 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    }, 500);
   }
 }
 
 async function handleUsersDelete(res, userId) {
+  console.log(`[DELETE USER] Received request to delete user ID: ${userId} (type: ${typeof userId})`);
+  
   if (!userId) {
+    console.error('[DELETE USER] No user ID provided');
     json(res, { error: 'User ID is required' }, 400);
+    return;
+  }
+  
+  // Convert userId to integer for database query
+  const userIdInt = parseInt(userId, 10);
+  if (isNaN(userIdInt)) {
+    console.error(`[DELETE USER] Invalid user ID format: ${userId}`);
+    json(res, { error: 'Invalid user ID format' }, 400);
     return;
   }
   
@@ -394,29 +561,80 @@ async function handleUsersDelete(res, userId) {
     // Get user info before deleting
     const { rows } = await pool.query(
       'SELECT first_name, last_name FROM users WHERE id = $1',
-      [userId]
+      [userIdInt]
     );
     
     if (rows.length === 0) {
+      console.error(`[DELETE USER] User not found with ID: ${userIdInt}`);
       json(res, { error: 'User not found' }, 404);
       return;
     }
     
     const userName = `${rows[0].first_name} ${rows[0].last_name}`;
+    console.log(`[DELETE USER] Deleting user: ${userName} (ID: ${userIdInt})`);
     
-    // Delete user
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    // First, delete or update activity_logs entries that reference this user
+    // This prevents foreign key constraint violations
+    try {
+      // Option 1: Delete activity logs for this user (recommended)
+      const deleteLogsResult = await pool.query(
+        'DELETE FROM activity_logs WHERE user_id = $1',
+        [userIdInt]
+      );
+      console.log(`[DELETE USER] Deleted ${deleteLogsResult.rowCount} activity log entries for user ${userIdInt}`);
+    } catch (logErr) {
+      // If activity_logs table doesn't exist or has issues, try to set user_id to NULL
+      console.warn(`[DELETE USER] Could not delete activity logs, trying to set user_id to NULL: ${logErr.message}`);
+      try {
+        await pool.query(
+          'UPDATE activity_logs SET user_id = NULL WHERE user_id = $1',
+          [userIdInt]
+        );
+      } catch (updateErr) {
+        console.warn(`[DELETE USER] Could not update activity logs either: ${updateErr.message}`);
+        // Continue with deletion anyway - the foreign key might allow NULL or CASCADE
+      }
+    }
     
-    // Log user deletion
-    await pool.query(`
-      INSERT INTO activity_logs (user_name, action)
-      VALUES ($1, 'user_removed')
-    `, [userName]);
+    // Now delete the user
+    await pool.query('DELETE FROM users WHERE id = $1', [userIdInt]);
+    console.log(`[DELETE USER] User deleted successfully: ${userName}`);
+    
+    // Log user deletion (without user_id since user is deleted)
+    try {
+      await pool.query(`
+        INSERT INTO activity_logs (user_name, action)
+        VALUES ($1, 'user_removed')
+      `, [userName]);
+      console.log(`[DELETE USER] Activity log created for user removal: ${userName}`);
+    } catch (logErr) {
+      console.warn(`[DELETE USER] Could not log user deletion: ${logErr.message}`);
+    }
     
     json(res, { message: 'User deleted successfully' });
   } catch (err) {
-    console.error('Delete user error:', err);
-    json(res, { error: 'Internal server error' }, 500);
+    console.error('[DELETE USER] Error details:', {
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+      detail: err.detail,
+      constraint: err.constraint
+    });
+    
+    // Provide more specific error messages
+    let errorMessage = 'Internal server error';
+    if (err.code === '23503') { // Foreign key violation
+      errorMessage = 'Cannot delete user: User has associated records that must be deleted first';
+    } else if (err.code === '23505') { // Unique violation
+      errorMessage = 'Cannot delete user: User record conflict';
+    } else if (err.message) {
+      errorMessage = err.message;
+    }
+    
+    json(res, { 
+      error: errorMessage, 
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined 
+    }, 500);
   }
 }
 
@@ -684,6 +902,7 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'DELETE' && path.startsWith('/users/')) {
       const userId = path.split('/')[2];
+      console.log(`[DELETE] Extracted userId from path: ${userId}, path: ${path}`);
       return await handleUsersDelete(res, userId);
     }
     

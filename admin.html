@@ -6,95 +6,173 @@
     <title>Admin Panel - HCA Healthcare</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        :root {
+            --brand-blue: #092240;
+            --brand-orange: #E75925;
+        }
         body {
             background: #edf1f8;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .header-container {
+            background: #fff;
+            border-bottom: 3px solid var(--brand-orange);
+            padding: 0 24px;
+            height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(9,34,64,0.08);
+        }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #edf0f5;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03);
+        }
+        .btn-primary {
+            background: var(--brand-blue);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(9,34,64,0.3);
+        }
+        .btn-primary:hover {
+            background: #0a2a4a;
+        }
+        .btn-secondary {
+            background: var(--brand-orange);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+        }
+        .btn-secondary:hover {
+            background: #d64f1f;
+        }
+        .scroll-box {
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .scroll-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scroll-box::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .scroll-box::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .scroll-box::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
         }
     </style>
 </head>
-<body class="min-h-screen p-6">
-    <div class="max-w-7xl mx-auto">
+<body>
+    <div style="display: flex; flex-direction: column; height: 100vh; overflow: hidden;">
         <!-- Header -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <div class="flex items-center justify-between">
+        <div class="header-container">
+            <div style="display: flex; align-items: center; gap: 16px;">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Admin Panel</h1>
-                    <p class="text-gray-600 mt-1">User Management & Activity Logs</p>
+                    <h1 style="font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.3px; margin: 0;">Admin Panel</h1>
+                    <p style="font-size: 12.5px; color: #94a3b8; margin-top: 3px; font-weight: 500;">User Management & Activity Logs</p>
                 </div>
-                <div class="flex items-center gap-4">
-                    <div class="text-right">
-                        <p class="text-sm text-gray-600">Logged in as</p>
-                        <p class="font-semibold text-gray-900" id="loggedInUser">Kevin</p>
-                    </div>
-                    <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold" id="userInitials">
-                        K
-                    </div>
-                    <button
-                        onclick="handleLogout()"
-                        class="ml-4 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition text-sm"
-                    >
-                        Logout
-                    </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="text-align: right;">
+                    <p style="font-size: 11px; color: #94a3b8; margin: 0;">Logged in as</p>
+                    <p style="font-size: 13px; font-weight: 600; color: #0f172a; margin: 0;" id="loggedInUser">Kevin</p>
                 </div>
+                <div style="width: 32px; height: 32px; background: var(--brand-orange); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; box-shadow: 0 1px 6px rgba(231,89,37,0.4);" id="userInitials">
+                    K
+                </div>
+                <button
+                    onclick="handleLogout()"
+                    style="padding: 5px 13px; border: 1px solid #e2e8f0; border-radius: 7px; background: #fff; font-size: 12.5px; font-weight: 500; color: #374151; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.04);"
+                    onmouseover="this.style.background='#f8fafc'"
+                    onmouseout="this.style.background='#fff'"
+                >
+                    Logout
+                </button>
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- LEFT COLUMN - User Management -->
-            <div class="lg:col-span-2">
-                <!-- Users List -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="text-xl font-bold text-gray-900">Users</h2>
-                        <button
-                            onclick="openAddUserModal()"
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-sm"
-                        >
-                            + Add User
-                        </button>
+        <!-- Main Content -->
+        <div style="flex: 1; overflow: hidden; padding: 24px 28px; display: flex; flex-direction: column;">
+            <div style="flex: 1; max-width: 1440px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; min-height: 0;">
+
+                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; align-items: stretch; flex: 1; min-height: 0;">
+                    <!-- LEFT COLUMN - User Management -->
+                    <div style="display: flex; flex-direction: column; min-height: 0;">
+                        <!-- Users List -->
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;">
+                                <div>
+                                    <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">Users</h2>
+                                    <p style="font-size: 12px; color: #94a3b8; margin: 0;">Manage system users and permissions</p>
+                                </div>
+                                <button
+                                    onclick="openAddUserModal()"
+                                    class="btn-primary"
+                                    style="padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap;"
+                                >
+                                    + Add User
+                                </button>
+                            </div>
+
+                            <!-- Users Table -->
+                            <div class="scroll-box" style="flex: 1; min-height: 0;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead style="position: sticky; top: 0; background: #fff; z-index: 10; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                                        <tr style="border-bottom: 2px solid #e2e8f0;">
+                                            <th style="text-align: left; padding: 14px 16px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; background: #fff;">Name</th>
+                                            <th style="text-align: left; padding: 14px 16px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; background: #fff;">Email</th>
+                                            <th style="text-align: left; padding: 14px 16px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; background: #fff;">Role</th>
+                                            <th style="text-align: left; padding: 14px 16px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; background: #fff;">Status</th>
+                                            <th style="text-align: right; padding: 14px 16px; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; background: #fff;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="usersTableBody">
+                                        <!-- Users will be populated here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Users Table -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b border-gray-200">
-                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Name</th>
-                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Email</th>
-                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Role</th>
-                                    <th class="text-left py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
-                                    <th class="text-right py-3 px-4 text-sm font-semibold text-gray-700">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="usersTableBody">
-                                <!-- Users will be populated here -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RIGHT COLUMN - Activity Logs -->
-            <div class="lg:col-span-1">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <h2 class="text-xl font-bold text-gray-900 mb-6">Activity Logs</h2>
+                    <!-- RIGHT COLUMN - Activity Logs -->
+                    <div style="display: flex; flex-direction: column; min-height: 0;">
+                        <div class="card" style="padding: 24px; display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                            <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;">
+                                <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">Activity Logs</h2>
+                                <p style="font-size: 12px; color: #94a3b8; margin: 0;">Recent sign-in and sign-out events</p>
+                            </div>
                     
-                    <!-- Filter -->
-                    <div class="mb-4">
-                        <select 
-                            id="logFilter"
-                            onchange="filterLogs()"
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="all">All Activities</option>
-                            <option value="signin">Sign In</option>
-                            <option value="signout">Sign Out</option>
-                        </select>
-                    </div>
+                            <!-- Filter -->
+                            <div style="margin-bottom: 16px; flex-shrink: 0;">
+                                <select 
+                                    id="logFilter"
+                                    onchange="filterLogs()"
+                                    style="width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #374151; background: #fff; cursor: pointer; outline: none; transition: all 0.2s;"
+                                    onfocus="this.style.borderColor='var(--brand-blue)'; this.style.boxShadow='0 0 0 3px rgba(9,34,64,0.1)'"
+                                    onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"
+                                >
+                                    <option value="all">All Activities</option>
+                                    <option value="signin">Sign In</option>
+                                    <option value="signout">Sign Out</option>
+                                </select>
+                            </div>
 
-                    <!-- Logs List -->
-                    <div class="space-y-3 max-h-96 overflow-y-auto" id="logsContainer">
-                        <!-- Logs will be populated here -->
+                            <!-- Logs List -->
+                            <div class="scroll-box" style="flex: 1; display: flex; flex-direction: column; gap: 10px; min-height: 0;" id="logsContainer">
+                                <!-- Logs will be populated here -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -102,82 +180,95 @@
     </div>
 
     <!-- Add User Modal -->
-    <div id="addUserModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" onclick="closeModalOnBackdrop(event)">
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
-            <div class="p-6 border-b border-gray-200">
-                <div class="flex items-center justify-between">
-                    <h3 class="text-xl font-bold text-gray-900">Add New User</h3>
-                    <button onclick="closeAddUserModal()" class="text-gray-400 hover:text-gray-600">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div id="addUserModal" style="position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5);" onclick="closeModalOnBackdrop(event)">
+        <div class="card" style="max-width: 480px; width: 90%; margin: 0 auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);" onclick="event.stopPropagation()">
+            <div style="padding: 20px 22px; border-bottom: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0;">Add New User</h3>
+                    <button onclick="closeAddUserModal()" style="background: none; border: none; color: #94a3b8; cursor: pointer; padding: 4px; border-radius: 4px; transition: all 0.2s;" onmouseover="this.style.background='#f1f5f9'; this.style.color='#64748b'" onmouseout="this.style.background='transparent'; this.style.color='#94a3b8'">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
             </div>
-            <form id="addUserForm" onsubmit="handleAddUser(event)" class="p-6 space-y-4">
+            <form id="addUserForm" onsubmit="handleAddUser(event)" style="padding: 20px 22px; display: flex; flex-direction: column; gap: 16px;">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                    <label style="display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px;">First Name</label>
                     <input
                         type="text"
                         id="newFirstName"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #0f172a; outline: none; transition: all 0.2s;"
+                        onfocus="this.style.borderColor='var(--brand-blue)'; this.style.boxShadow='0 0 0 3px rgba(9,34,64,0.1)'"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                    <label style="display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px;">Last Name</label>
                     <input
                         type="text"
                         id="newLastName"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #0f172a; outline: none; transition: all 0.2s;"
+                        onfocus="this.style.borderColor='var(--brand-blue)'; this.style.boxShadow='0 0 0 3px rgba(9,34,64,0.1)'"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <label style="display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px;">Email</label>
                     <input
                         type="email"
                         id="newEmail"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #0f172a; outline: none; transition: all 0.2s;"
+                        onfocus="this.style.borderColor='var(--brand-blue)'; this.style.boxShadow='0 0 0 3px rgba(9,34,64,0.1)'"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"
                     />
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <label style="display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px;">Role</label>
                     <select
                         id="newRole"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #0f172a; background: #fff; cursor: pointer; outline: none; transition: all 0.2s;"
+                        onfocus="this.style.borderColor='var(--brand-blue)'; this.style.boxShadow='0 0 0 3px rgba(9,34,64,0.1)'"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"
                     >
-                        <option value="Executive Director">Executive Director</option>
-                        <option value="Administrator">Administrator</option>
-                        <option value="Manager">Manager</option>
-                        <option value="Analyst">Analyst</option>
+                        <option value="Super Admin">Super Admin</option>
+                        <option value="Regional Manager">Regional Manager</option>
+                        <option value="Facility Administrator">Facility Administrator</option>
+                        <option value="Operator">Operator</option>
                         <option value="Viewer">Viewer</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <label style="display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px;">Password</label>
                     <input
                         type="password"
                         id="newPassword"
                         required
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="Set initial password"
+                        style="width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; color: #0f172a; outline: none; transition: all 0.2s;"
+                        onfocus="this.style.borderColor='var(--brand-blue)'; this.style.boxShadow='0 0 0 3px rgba(9,34,64,0.1)'"
+                        onblur="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'"
                     />
-                    <p class="text-xs text-gray-500 mt-1">User can change this after first login</p>
+                    <p style="font-size: 11px; color: #94a3b8; margin-top: 6px; margin-bottom: 0;">User can change this after first login</p>
                 </div>
-                <div class="flex gap-3 pt-4">
+                <div style="display: flex; gap: 12px; padding-top: 8px;">
                     <button
                         type="submit"
-                        class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                        class="btn-primary"
+                        style="flex: 1; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
                     >
                         Add User
                     </button>
                     <button
                         type="button"
                         onclick="closeAddUserModal()"
-                        class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                        style="flex: 1; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; color: #374151; cursor: pointer; transition: all 0.2s;"
+                        onmouseover="this.style.background='#f8fafc'"
+                        onmouseout="this.style.background='#fff'"
                     >
                         Cancel
                     </button>
@@ -186,22 +277,86 @@
         </div>
     </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" onclick="closeModalOnBackdrop(event)">
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
-            <div class="p-6">
-                <h3 class="text-xl font-bold text-gray-900 mb-2">Delete User</h3>
-                <p class="text-gray-600 mb-6">Are you sure you want to delete <span id="deleteUserName" class="font-semibold"></span>? This action cannot be undone.</p>
-                <div class="flex gap-3">
+    <!-- First Delete Confirmation Modal -->
+    <div id="deleteModal" style="position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.5);" onclick="closeModalOnBackdrop(event)">
+        <div class="card" style="max-width: 480px; width: 90%; margin: 0 auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);" onclick="event.stopPropagation()">
+            <div style="padding: 20px 22px;">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <svg width="20" height="20" fill="none" stroke="#dc2626" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div style="flex: 1;">
+                        <h3 style="font-size: 18px; font-weight: 700; color: #0f172a; margin: 0 0 4px 0;">Delete User</h3>
+                        <p style="font-size: 13px; color: #64748b; margin: 0;">Are you sure you want to delete this user?</p>
+                    </div>
+                </div>
+                <div style="padding: 12px 14px; background: #f8fafc; border-radius: 8px; margin-bottom: 20px; border-left: 3px solid #dc2626;">
+                    <p style="font-size: 13px; color: #0f172a; margin: 0; font-weight: 500;">
+                        <span id="deleteUserName" style="font-weight: 600; color: #dc2626;"></span>
+                    </p>
+                    <p style="font-size: 12px; color: #64748b; margin: 4px 0 0 0;">This action cannot be undone.</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
                     <button
-                        onclick="confirmDelete()"
-                        class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition"
+                        onclick="showFinalDeleteConfirmation()"
+                        style="flex: 1; padding: 8px 16px; background: #dc2626; color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;"
+                        onmouseover="this.style.background='#b91c1c'"
+                        onmouseout="this.style.background='#dc2626'"
                     >
-                        Delete
+                        Continue
                     </button>
                     <button
                         onclick="closeDeleteModal()"
-                        class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                        style="flex: 1; padding: 8px 16px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-size: 13px; font-weight: 500; color: #374151; cursor: pointer; transition: all 0.2s;"
+                        onmouseover="this.style.background='#f8fafc'"
+                        onmouseout="this.style.background='#fff'"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Final Delete Confirmation Modal (Double Check) -->
+    <div id="finalDeleteModal" style="position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.6);" onclick="closeModalOnBackdrop(event)">
+        <div class="card" style="max-width: 480px; width: 90%; margin: 0 auto; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.08);" onclick="event.stopPropagation()">
+            <div style="padding: 24px 26px;">
+                <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px;">
+                    <div style="width: 48px; height: 48px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 2px solid #dc2626;">
+                        <svg width="24" height="24" fill="none" stroke="#dc2626" viewBox="0 0 24 24" style="stroke-width: 2.5;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </div>
+                    <div style="flex: 1;">
+                        <h3 style="font-size: 20px; font-weight: 700; color: #0f172a; margin: 0 0 6px 0;">Final Confirmation</h3>
+                        <p style="font-size: 13px; color: #64748b; margin: 0;">Please confirm one more time</p>
+                    </div>
+                </div>
+                <div style="padding: 16px; background: #fef2f2; border-radius: 10px; margin-bottom: 24px; border: 1px solid #fecaca;">
+                    <p style="font-size: 14px; color: #991b1b; margin: 0 0 8px 0; font-weight: 600;">⚠️ Warning: This action is permanent</p>
+                    <p style="font-size: 13px; color: #7f1d1d; margin: 0;">
+                        You are about to permanently delete <strong id="finalDeleteUserName" style="color: #991b1b;"></strong>. 
+                        All user data will be removed and cannot be recovered.
+                    </p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button
+                        onclick="confirmDelete()"
+                        id="finalDeleteButton"
+                        style="flex: 1; padding: 10px 18px; background: #dc2626; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(220,38,38,0.3);"
+                        onmouseover="this.style.background='#b91c1c'; this.style.boxShadow='0 4px 8px rgba(220,38,38,0.4)'"
+                        onmouseout="this.style.background='#dc2626'; this.style.boxShadow='0 2px 4px rgba(220,38,38,0.3)'"
+                    >
+                        Yes, Delete User
+                    </button>
+                    <button
+                        onclick="closeFinalDeleteModal()"
+                        style="flex: 1; padding: 10px 18px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; font-size: 14px; font-weight: 500; color: #374151; cursor: pointer; transition: all 0.2s;"
+                        onmouseover="this.style.background='#f8fafc'; this.style.borderColor='#cbd5e1'"
+                        onmouseout="this.style.background='#fff'; this.style.borderColor='#e2e8f0'"
                     >
                         Cancel
                     </button>
@@ -278,33 +433,47 @@
 
         function renderUsers() {
             const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = users.map(user => `
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="py-3 px-4">
-                        <div class="font-medium text-gray-900">${user.firstName} ${user.lastName}</div>
+            if (users.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="padding: 40px 16px; text-align: center; color: #94a3b8; font-size: 13px;">
+                            No users found. Click "+ Add User" to create one.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            tbody.innerHTML = users.map((user, index) => `
+                <tr style="border-bottom: 1px solid #f1f5f9; transition: background 0.2s;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='transparent'">
+                    <td style="padding: 14px 16px;">
+                        <div style="font-size: 13.5px; font-weight: 500; color: #0f172a;">${user.firstName} ${user.lastName}</div>
                     </td>
-                    <td class="py-3 px-4 text-gray-600">${user.email}</td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
-                            user.role === 'Administrator' ? 'bg-purple-100 text-purple-700' :
-                            user.role === 'Executive Director' ? 'bg-blue-100 text-blue-700' :
-                            user.role === 'Manager' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-700'
+                    <td style="padding: 14px 16px; font-size: 13px; color: #64748b;">${user.email}</td>
+                    <td style="padding: 14px 16px;">
+                        <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; ${
+                            user.role === 'Super Admin' ? 'background: #fee2e2; color: #dc2626;' :
+                            user.role === 'Regional Manager' ? 'background: #dbeafe; color: #2563eb;' :
+                            user.role === 'Facility Administrator' ? 'background: #f3e8ff; color: #7c3aed;' :
+                            user.role === 'Operator' ? 'background: #dcfce7; color: #16a34a;' :
+                            user.role === 'Viewer' ? 'background: #fef3c7; color: #d97706;' :
+                            'background: #f1f5f9; color: #475569;'
                         }">
                             ${user.role}
                         </span>
                     </td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
-                            (user.status || 'Active') === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    <td style="padding: 14px 16px;">
+                        <span style="display: inline-block; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; ${
+                            (user.status || 'Active') === 'Active' ? 'background: #dcfce7; color: #16a34a;' : 'background: #fee2e2; color: #dc2626;'
                         }">
                             ${user.status || 'Active'}
                         </span>
                     </td>
-                    <td class="py-3 px-4 text-right">
+                    <td style="padding: 14px 16px; text-align: right;">
                         <button
-                            onclick="deleteUser(${user.id})"
-                            class="text-red-600 hover:text-red-800 font-medium text-sm"
+                            onclick="deleteUser('${user.id}')"
+                            style="font-size: 12px; font-weight: 500; color: #dc2626; background: none; border: none; cursor: pointer; padding: 6px 12px; border-radius: 6px; transition: all 0.2s;"
+                            onmouseover="this.style.background='#fee2e2'; this.style.color='#991b1b'"
+                            onmouseout="this.style.background='transparent'; this.style.color='#dc2626'"
                         >
                             Remove
                         </button>
@@ -324,32 +493,34 @@
             // Sort by timestamp (newest first) - already sorted by API, but ensure it
             filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-            container.innerHTML = filteredLogs.slice(0, 20).map(log => {
-                const date = new Date(log.timestamp);
-                const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const isSignIn = log.action === 'signin';
-                
-                return `
-                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                        <div class="w-2 h-2 rounded-full mt-2 ${
-                            isSignIn ? 'bg-green-500' : 'bg-red-500'
-                        }"></div>
-                        <div class="flex-1">
-                            <div class="flex items-center justify-between">
-                                <p class="font-medium text-gray-900 text-sm">${log.userName}</p>
-                                <p class="text-xs text-gray-500">${dateStr} ${timeStr}</p>
-                            </div>
-                            <p class="text-xs text-gray-600 mt-1">
-                                ${isSignIn ? 'Signed in' : 'Signed out'}
-                            </p>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
             if (filteredLogs.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-8">No activity logs found</p>';
+                container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; padding: 60px 20px;"><p style="color: #94a3b8; text-align: center; font-size: 13px; margin: 0;">No activity logs found</p></div>';
+            } else {
+                container.innerHTML = filteredLogs.slice(0, 30).map(log => {
+                    const date = new Date(log.timestamp);
+                    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isSignIn = log.action === 'signin';
+                    
+                    return `
+                        <div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; transition: all 0.2s;" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#cbd5e1'" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#e2e8f0'">
+                            <div style="width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: ${
+                                isSignIn ? '#16a34a' : '#dc2626'
+                            }; box-shadow: 0 0 0 3px ${
+                                isSignIn ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)'
+                            };"></div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                    <p style="font-size: 13px; font-weight: 600; color: #0f172a; margin: 0;">${log.userName}</p>
+                                    <p style="font-size: 11px; color: #94a3b8; margin: 0; white-space: nowrap; margin-left: 12px;">${dateStr} ${timeStr}</p>
+                                </div>
+                                <p style="font-size: 12px; color: #64748b; margin: 0;">
+                                    ${isSignIn ? '✓ Signed in' : '✗ Signed out'}
+                                </p>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
             }
         }
 
@@ -359,13 +530,11 @@
         }
 
         function openAddUserModal() {
-            document.getElementById('addUserModal').classList.remove('hidden');
-            document.getElementById('addUserModal').classList.add('flex');
+            document.getElementById('addUserModal').style.display = 'flex';
         }
 
         function closeAddUserModal() {
-            document.getElementById('addUserModal').classList.add('hidden');
-            document.getElementById('addUserModal').classList.remove('flex');
+            document.getElementById('addUserModal').style.display = 'none';
             document.getElementById('addUserForm').reset();
         }
 
@@ -373,19 +542,55 @@
             if (event.target === event.currentTarget) {
                 closeAddUserModal();
                 closeDeleteModal();
+                closeFinalDeleteModal();
             }
         }
 
         async function handleAddUser(event) {
             event.preventDefault();
             
+            // Get form elements
+            const firstNameInput = document.getElementById('newFirstName');
+            const lastNameInput = document.getElementById('newLastName');
+            const emailInput = document.getElementById('newEmail');
+            const roleInput = document.getElementById('newRole');
+            const passwordInput = document.getElementById('newPassword');
+            const submitButton = event.target.querySelector('button[type="submit"]');
+            
+            // Get values
             const newUser = {
-                firstName: document.getElementById('newFirstName').value,
-                lastName: document.getElementById('newLastName').value,
-                email: document.getElementById('newEmail').value,
-                role: document.getElementById('newRole').value,
-                password: document.getElementById('newPassword').value
+                firstName: firstNameInput.value.trim(),
+                lastName: lastNameInput.value.trim(),
+                email: emailInput.value.trim(),
+                role: roleInput.value,
+                password: passwordInput.value
             };
+
+            // Validate
+            if (!newUser.firstName || !newUser.lastName || !newUser.email || !newUser.role || !newUser.password) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(newUser.email)) {
+                alert('Please enter a valid email address');
+                return;
+            }
+
+            // Validate password length
+            if (newUser.password.length < 6) {
+                alert('Password must be at least 6 characters long');
+                return;
+            }
+
+            // Disable submit button and show loading state
+            const originalButtonText = submitButton.textContent;
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adding...';
+            submitButton.style.opacity = '0.6';
+            submitButton.style.cursor = 'not-allowed';
 
             try {
                 const response = await fetch(`${API_BASE}/users`, {
@@ -396,58 +601,126 @@
                     body: JSON.stringify(newUser)
                 });
 
+                const data = await response.json();
+
                 if (response.ok) {
-                    const addedUser = await response.json();
-                    users.push(addedUser);
-                    renderUsers();
-                    loadActivityLogs(document.getElementById('logFilter').value);
+                    // Success - reload users from server to ensure consistency
+                    await loadUsers();
+                    // Reload activity logs to show the user_added event
+                    await loadActivityLogs(document.getElementById('logFilter').value);
+                    // Close modal
                     closeAddUserModal();
+                    // Show success message (optional)
+                    console.log('User added successfully:', data);
                 } else {
-                    const error = await response.json();
-                    alert(error.error || 'Failed to add user');
+                    // Show error message
+                    const errorMessage = data.error || `Failed to add user (${response.status})`;
+                    alert(errorMessage);
+                    console.error('Failed to add user:', data);
                 }
             } catch (error) {
                 console.error('Error adding user:', error);
-                alert('Failed to add user. Please try again.');
+                alert('Failed to connect to server. Please ensure the API server is running.');
+            } finally {
+                // Re-enable submit button
+                submitButton.disabled = false;
+                submitButton.textContent = originalButtonText;
+                submitButton.style.opacity = '1';
+                submitButton.style.cursor = 'pointer';
             }
         }
 
         function deleteUser(userId) {
-            const user = users.find(u => u.id === userId);
+            console.log('deleteUser called with userId:', userId, 'type:', typeof userId);
+            console.log('Available users:', users);
+            
+            // Convert userId to string for comparison (user.id is returned as string from API)
+            const userIdStr = String(userId);
+            const user = users.find(u => String(u.id) === userIdStr);
+            
             if (user) {
                 userToDelete = user;
                 document.getElementById('deleteUserName').textContent = `${user.firstName} ${user.lastName}`;
-                document.getElementById('deleteModal').classList.remove('hidden');
-                document.getElementById('deleteModal').classList.add('flex');
+                document.getElementById('deleteModal').style.display = 'flex';
+            } else {
+                console.error('User not found with ID:', userId);
+                alert('User not found. Please refresh the page and try again.');
             }
         }
 
         function closeDeleteModal() {
-            document.getElementById('deleteModal').classList.add('hidden');
-            document.getElementById('deleteModal').classList.remove('flex');
+            document.getElementById('deleteModal').style.display = 'none';
+            userToDelete = null;
+        }
+
+        function showFinalDeleteConfirmation() {
+            if (userToDelete) {
+                // Close first modal
+                document.getElementById('deleteModal').style.display = 'none';
+                // Show final confirmation modal
+                document.getElementById('finalDeleteUserName').textContent = `${userToDelete.firstName} ${userToDelete.lastName}`;
+                document.getElementById('finalDeleteModal').style.display = 'flex';
+            }
+        }
+
+        function closeFinalDeleteModal() {
+            document.getElementById('finalDeleteModal').style.display = 'none';
             userToDelete = null;
         }
 
         async function confirmDelete() {
-            if (userToDelete) {
-                try {
-                    const response = await fetch(`${API_BASE}/users/${userToDelete.id}`, {
-                        method: 'DELETE',
-                    });
+            if (!userToDelete) {
+                return;
+            }
 
-                    if (response.ok) {
-                        users = users.filter(u => u.id !== userToDelete.id);
-                        renderUsers();
-                        loadActivityLogs(document.getElementById('logFilter').value);
-                        closeDeleteModal();
-                    } else {
-                        const error = await response.json();
-                        alert(error.error || 'Failed to delete user');
+            // Disable button during deletion
+            const deleteButton = document.getElementById('finalDeleteButton');
+            const originalButtonText = deleteButton.textContent;
+            deleteButton.disabled = true;
+            deleteButton.textContent = 'Deleting...';
+            deleteButton.style.opacity = '0.6';
+            deleteButton.style.cursor = 'not-allowed';
+
+            try {
+                console.log('Deleting user with ID:', userToDelete.id);
+                const response = await fetch(`${API_BASE}/users/${userToDelete.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
                     }
-                } catch (error) {
-                    console.error('Error deleting user:', error);
-                    alert('Failed to delete user. Please try again.');
+                });
+
+                console.log('Delete response status:', response.status);
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Delete response:', data);
+                    // Success - reload users from server
+                    await loadUsers();
+                    // Reload activity logs to show the user_removed event
+                    await loadActivityLogs(document.getElementById('logFilter').value);
+                    // Close modal
+                    closeFinalDeleteModal();
+                    // Show success message
+                    console.log('User deleted successfully');
+                } else {
+                    const error = await response.json().catch(() => ({ error: `HTTP ${response.status}: ${response.statusText}` }));
+                    console.error('Delete failed:', error);
+                    alert(error.error || `Failed to delete user (${response.status})`);
+                    // Re-enable button on error
+                    deleteButton.disabled = false;
+                    deleteButton.textContent = originalButtonText;
+                    deleteButton.style.opacity = '1';
+                    deleteButton.style.cursor = 'pointer';
                 }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Failed to delete user: ' + error.message + '. Please check the console for details.');
+                // Re-enable button on error
+                deleteButton.disabled = false;
+                deleteButton.textContent = originalButtonText;
+                deleteButton.style.opacity = '1';
+                deleteButton.style.cursor = 'pointer';
             }
         }
 

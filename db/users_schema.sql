@@ -46,3 +46,4 @@ INSERT INTO users (first_name, last_name, email, password_hash, role, status) VA
 ON CONFLICT (email) DO NOTHING;
 
 
+

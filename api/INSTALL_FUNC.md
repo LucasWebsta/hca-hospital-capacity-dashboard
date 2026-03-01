@@ -54,3 +54,4 @@ If `func` still isn't recognized after installation:
 4. Verify installation location and add to PATH manually
 
 
+
