@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS activity_logs (
     id SERIAL PRIMARY KEY,
     user_id INT REFERENCES users(id),
     user_name TEXT NOT NULL,
-    action TEXT NOT NULL CHECK (action IN ('signin', 'signout', 'user_added', 'user_removed', 'user_updated')),
+    action TEXT NOT NULL CHECK (action IN ('signin', 'signout', 'user_added', 'user_removed', 'user_updated', 'failed_login')),
     timestamp TIMESTAMPTZ DEFAULT NOW(),
     ip_address TEXT,
     user_agent TEXT

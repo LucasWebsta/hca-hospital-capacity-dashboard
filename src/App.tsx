@@ -58,6 +58,17 @@ function App() {
   });
   const [overviewMetricsExpanded, setOverviewMetricsExpanded] = useState(false);
   const [metricTooltipsOn, setMetricTooltipsOn] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     api
@@ -75,9 +86,35 @@ function App() {
         fontFamily:
           '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
         overflow: "hidden",
+        position: "relative",
       }}
     >
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} facilityName={selectedFacilityName} />
+      {/* Mobile overlay */}
+      {sidebarOpen && isMobile && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            zIndex: 998,
+          }}
+        />
+      )}
+
+      <Sidebar 
+        activeTab={activeTab} 
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          setSidebarOpen(false);
+        }} 
+        facilityName={selectedFacilityName}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
 
       <div
         style={{
@@ -85,6 +122,7 @@ function App() {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          minWidth: 0,
         }}
       >
         <Header
@@ -96,18 +134,20 @@ function App() {
             setSelectedFacilityName(name);
           }}
           selectedFacilityName={selectedFacilityName}
+          onMenuClick={() => setSidebarOpen(true)}
         />
 
         {activeTab === "dashboard" && (
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 16px" : "20px 28px" }}>
             
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 330px",
-                gap: 22,
+                gridTemplateColumns: isMobile ? "1fr" : window.innerWidth < 1024 ? "1fr" : "1fr 330px",
+                gap: isMobile ? 16 : 22,
                 alignItems: "start",
                 maxWidth: 1440,
+                margin: "0 auto",
               }}
             >
               <div
@@ -172,8 +212,12 @@ function App() {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(4, 1fr)",
-                      gap: 16,
+                      gridTemplateColumns: isMobile 
+                        ? "1fr" 
+                        : window.innerWidth < 1024 
+                        ? "repeat(2, 1fr)" 
+                        : "repeat(4, 1fr)",
+                      gap: isMobile ? 12 : 16,
                     }}
                   >
                     <MetricCard
@@ -308,7 +352,7 @@ function App() {
         {activeTab === "forecast" && <ForecastPage />}
 
         {activeTab === "alerts" && (
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 16px" : "20px 28px" }}>
             <div style={{ marginBottom: 20 }}>
               <div
                 style={{
@@ -338,7 +382,7 @@ function App() {
         )}
 
         {activeTab === "reports" && (
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }} className="reports-print-container">
+          <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "12px 16px" : "20px 28px" }} className="reports-print-container">
             <ReportsPanel />
           </div>
         )}
