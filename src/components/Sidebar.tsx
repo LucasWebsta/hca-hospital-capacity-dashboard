@@ -1,4 +1,4 @@
-import { Bell, Settings, FileText, Home, Activity } from 'lucide-react';
+import { Bell, FileText, Home, Activity } from 'lucide-react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -14,7 +14,6 @@ const navItems = [
   { id: 'forecast', label: 'Forecast & Analysis', icon: Activity },
   { id: 'alerts', label: 'Alerts', icon: Bell },
   { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
