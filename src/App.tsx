@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
   Header,
@@ -12,8 +13,25 @@ import { api } from './api';
 import type { CensusMetrics } from './api';
 import './App.css';
 
+function pathnameToTab(pathname: string): string {
+  if (pathname === '/' || pathname === '') return 'dashboard';
+  const segment = pathname.replace(/^\//, '').split('/')[0];
+  return segment || 'dashboard';
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = pathnameToTab(location.pathname);
+
+  const setActiveTab = (tab: string) => {
+    if (tab === 'dashboard') navigate('/');
+    else navigate('/' + tab);
+  };
+
+  const [trendDays, setTrendDays] = useState(30);
+  const [selectedFacilityId, setSelectedFacilityId] = useState<number | null>(null);
+  const [selectedFacilityName, setSelectedFacilityName] = useState('All Facilities');
   const [census, setCensus] = useState<CensusMetrics>({
     totalCensus: 948, totalCapacity: 1112, occupancyRate: 85.2, sevenDayForecast: 963,
   });
@@ -40,15 +58,20 @@ function App() {
   }, []);
 
   useEffect(() => {
-    api.getCensusMetrics().then(setCensus).catch(console.error);
-  }, []);
+    api.getCensusMetrics(selectedFacilityId ?? undefined).then(setCensus).catch(console.error);
+  }, [selectedFacilityId]);
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: '#edf1f8', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', overflow: 'hidden' }}>
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Header />
+        <Header
+          trendDays={trendDays}
+          onTrendDaysChange={setTrendDays}
+          onAlertsClick={() => navigate('/alerts')}
+          onFacilityChange={(id: number | null, name: string) => { setSelectedFacilityId(id); setSelectedFacilityName(name); }}
+        />
 
         {activeTab === 'dashboard' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
@@ -67,7 +90,9 @@ function App() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Hospital System Overview</div>
-                      <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Across 5 facilities · May 7, 2025</div>
+                    <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>
+                      {selectedFacilityId ? selectedFacilityName : `Across all facilities`} · Real-time
+                    </div>
                     </div>
                     <span style={{ fontSize: 11, background: '#f0fdf4', color: '#16a34a', borderRadius: 5, padding: '3px 9px', fontWeight: 700, border: '1px solid #bbf7d0' }}>● Live</span>
                   </div>
@@ -91,7 +116,7 @@ function App() {
                     <MetricCard
                       title="7-Day Forecast"
                       value={census.sevenDayForecast ? `${Math.round((census.sevenDayForecast / census.totalCapacity) * 100)}%` : '—'}
-                      change={census.sevenDayForecast ? `+${census.sevenDayForecast - census.totalCensus} beds` : ''}
+                      change={census.sevenDayForecast ? `±${census.sevenDayForecast - census.totalCensus} beds` : ''}
                       subtext="Predicted Peak"
                       accentColor="#E75925"
                     />
@@ -104,15 +129,15 @@ function App() {
                 </div>
 
                 {/* Occupancy Trend chart */}
-                <OccupancyTrendChart />
+                <OccupancyTrendChart days={trendDays} facilityId={selectedFacilityId ?? undefined} />
 
                 {/* Facilities table */}
-                <FacilitiesAtRisk />
+                <FacilitiesAtRisk facilityId={selectedFacilityId ?? undefined} />
               </div>
 
               {/* RIGHT COLUMN */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <ForecastOccupancyChart />
+                <ForecastOccupancyChart facilityId={selectedFacilityId ?? undefined} />
                 <AlertsPanel />
               </div>
 
@@ -120,12 +145,23 @@ function App() {
           </div>
         )}
 
-        {activeTab !== 'dashboard' && (
+        {activeTab === 'alerts' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', letterSpacing: -0.3 }}>Alerts & Notifications</div>
+              <div style={{ fontSize: 12.5, color: '#94a3b8', marginTop: 3, fontWeight: 500 }}>Create and manage your alert rules</div>
+            </div>
+            <div style={{ width: '100%' }}>
+              <AlertsPanel />
+            </div>
+          </div>
+        )}
+
+        {activeTab !== 'dashboard' && activeTab !== 'alerts' && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
                 {activeTab === 'forecast' && 'Forecast & Analysis'}
-                {activeTab === 'alerts' && 'Alerts & Notifications'}
                 {activeTab === 'settings' && 'Settings'}
                 {activeTab === 'reports' && 'Reports'}
               </h3>

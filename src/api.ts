@@ -19,6 +19,8 @@ export interface CensusMetrics {
   totalCapacity: number;
   occupancyRate: number;
   sevenDayForecast: number;
+  /** Sum of latest ICU metric_value across facilities (for capacity alerts) */
+  icuTotal?: number;
 }
 
 export interface Facility {
@@ -44,6 +46,7 @@ export interface TrendPoint {
   forecast?: number;
   lower?: number;
   upper?: number;
+  occupancy_pct?: number;
 }
 
 export interface ForecastResponse {
@@ -51,14 +54,57 @@ export interface ForecastResponse {
   stats: { mae: number; rmse: number; accuracy: number; upliftPct: number };
 }
 
+/** For alerts page: facility dropdown (hospitals table) */
+export interface FacilityListItem {
+  id: number;
+  name: string;
+}
+
+/** User-created alert rule */
+export interface AlertRule {
+  id: number;
+  hospital_id: number;
+  facility_name: string;
+  metric: string;
+  condition_type: 'percent_occupancy' | 'value_threshold' | 'surge_trend';
+  threshold_pct?: number;
+  operator?: string;
+  value_number?: number;
+  window_minutes?: number;
+  created_at: string;
+}
+
+/** Payload to create an alert rule */
+export interface CreateAlertRulePayload {
+  hospital_id: number;
+  metric: string;
+  condition_type: string;
+  threshold_pct?: number;
+  operator?: string;
+  value_number?: number;
+  window_minutes?: number;
+}
+
 // ─────────────────────────────────────────────
 // API calls
 // ─────────────────────────────────────────────
 
 export const api = {
-  getCensusMetrics: () => get<CensusMetrics>('/census'),
-  getFacilities:    () => get<Facility[]>('/facilities'),
+  getCensusMetrics: (facilityId?: number) => get<CensusMetrics>(facilityId ? `/census?facility_id=${facilityId}` : '/census'),
+  getFacilities:    (facilityId?: number) => get<Facility[]>(facilityId ? `/facilities?facility_id=${facilityId}` : '/facilities'),
   getAlerts:        () => get<Alert[]>('/alerts'),
-  getTrend:         (days = 30) => get<TrendPoint[]>(`/trend?days=${days}`),
-  getForecast:      (days = 7)  => get<ForecastResponse>(`/forecast?days=${days}`),
+  getTrend:         (days = 30, facilityId?: number) => get<TrendPoint[]>(`/trend?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
+  getForecast:      (days = 7, facilityId?: number)  => get<ForecastResponse>(`/forecast?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
+  getFacilitiesList: () => get<FacilityListItem[]>('/facilitiesList'),
+  getMetricTypes:   () => get<string[]>('/metricTypes'),
+  getAlertRules:    () => get<AlertRule[]>('/alertRules'),
+  createAlertRule:  (payload: CreateAlertRulePayload) =>
+    fetch(`${BASE}/alertRulesPost`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(async (r) => {
+      if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json() as Promise<AlertRule>;
+    }),
+  deleteAlertRule:  (id: number) =>
+    fetch(`${BASE}/alertRulesDelete?id=${id}`, { method: 'DELETE' }).then((r) => {
+      if (!r.ok && r.status !== 204) throw new Error(`API error ${r.status}`);
+    }),
 };

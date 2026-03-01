@@ -9,28 +9,43 @@ export async function facilitiesHandler(
   try {
     const db = getDb();
     const { rows } = await db.query(`
-      WITH latest AS (
-        SELECT MAX(census_date) AS max_date FROM hospital_census
+      WITH latest_per_facility AS (
+        SELECT facility_id, MAX(source_update_date) AS max_ts
+        FROM facility_metrics
+        WHERE LOWER(metric) IN ('total census', 'total')
+        GROUP BY facility_id
+      ),
+      latest_vals AS (
+        SELECT fm.facility_id, fm.metric_value
+        FROM facility_metrics fm
+        JOIN latest_per_facility l ON fm.facility_id = l.facility_id
+          AND fm.source_update_date = l.max_ts AND LOWER(fm.metric) IN ('total census', 'total')
+      ),
+      ranked AS (
+        SELECT facility_id, metric_value, source_update_date,
+               ROW_NUMBER() OVER (PARTITION BY facility_id ORDER BY source_update_date DESC) AS rn
+        FROM facility_metrics
+        WHERE LOWER(metric) IN ('total census', 'total')
+      ),
+      prev_vals AS (
+        SELECT facility_id, metric_value AS prev_val
+        FROM ranked
+        WHERE rn = 2
       )
       SELECT
-        h.name,
-        hc.current_census                                              AS census,
-        ROUND(
-          (hc.current_census::numeric / NULLIF(h.capacity, 0)) * 100, 1
-        )                                                              AS occupancy,
-        h.capacity,
+        f.name,
+        COALESCE(lv.metric_value, 0)::int AS census,
+        ROUND((COALESCE(lv.metric_value, 0)::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS occupancy,
+        f.capacity,
         CASE
-          WHEN hc.current_census > COALESCE(prev.current_census, hc.current_census) THEN 'up'
-          WHEN hc.current_census < COALESCE(prev.current_census, hc.current_census) THEN 'down'
+          WHEN COALESCE(lv.metric_value, 0) > COALESCE(pv.prev_val, lv.metric_value, 0) THEN 'up'
+          WHEN COALESCE(lv.metric_value, 0) < COALESCE(pv.prev_val, lv.metric_value, 0) THEN 'down'
           ELSE 'flat'
         END AS trend
-      FROM  hospital_census hc
-      JOIN  hospitals h  ON hc.hospital_id = h.id
-      LEFT JOIN hospital_census prev
-        ON  prev.hospital_id = hc.hospital_id
-        AND prev.census_date  = hc.census_date - INTERVAL '1 day'
-      WHERE hc.census_date = (SELECT max_date FROM latest)
-      ORDER BY occupancy DESC
+      FROM facilities f
+      LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
+      LEFT JOIN prev_vals pv ON f.facility_id = pv.facility_id
+      ORDER BY occupancy DESC NULLS LAST
       LIMIT 5
     `);
     return {

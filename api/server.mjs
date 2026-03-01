@@ -34,7 +34,22 @@ function json(res, data, status = 200) {
 }
 
 // ── /api/census ──────────────────────────────────────────────────────────────
-async function handleCensus(res) {
+async function handleCensus(res, facilityId = null) {
+  if (facilityId) {
+    const { rows } = await pool.query(`
+      SELECT DISTINCT ON (fm.facility_id)
+        fm.metric_value::int AS "totalCensus",
+        f.capacity::int      AS "totalCapacity",
+        ROUND((fm.metric_value::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS "occupancyRate",
+        ROUND(fm.metric_value * 1.015)::int AS "sevenDayForecast"
+      FROM facility_metrics fm
+      JOIN facilities f ON f.facility_id = fm.facility_id
+      WHERE fm.facility_id = $1
+        AND LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+      ORDER BY fm.facility_id, fm.source_update_date DESC
+    `, [facilityId]);
+    return json(res, rows[0] ?? {});
+  }
   const { rows } = await pool.query(`
     WITH latest_per_facility AS (
       SELECT DISTINCT ON (fm.facility_id)
@@ -43,7 +58,7 @@ async function handleCensus(res) {
         f.capacity
       FROM facility_metrics fm
       JOIN facilities f ON f.facility_id = fm.facility_id
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
       ORDER BY fm.facility_id, fm.source_update_date DESC
     ),
     totals AS (
@@ -70,14 +85,20 @@ async function handleCensus(res) {
   json(res, rows[0] ?? {});
 }
 
+// ── /api/facilitiesList ───────────────────────────────────────────────────────
+async function handleFacilitiesList(res) {
+  const { rows } = await pool.query(`SELECT facility_id AS id, name FROM facilities ORDER BY name`);
+  json(res, rows);
+}
+
 // ── /api/facilities ───────────────────────────────────────────────────────────
-async function handleFacilities(res) {
+async function handleFacilities(res, facilityId = null) {
   const { rows } = await pool.query(`
     WITH latest AS (
       SELECT DISTINCT ON (fm.facility_id)
         fm.facility_id, fm.metric_value AS census, fm.source_update_date AS latest_ts
       FROM facility_metrics fm
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
       ORDER BY fm.facility_id, fm.source_update_date DESC
     ),
     day_ago AS (
@@ -85,7 +106,7 @@ async function handleFacilities(res) {
         fm.facility_id, fm.metric_value AS prev_census
       FROM facility_metrics fm
       JOIN latest l ON l.facility_id = fm.facility_id
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
         AND fm.source_update_date <= l.latest_ts - INTERVAL '24 hours'
       ORDER BY fm.facility_id, fm.source_update_date DESC
     )
@@ -102,9 +123,9 @@ async function handleFacilities(res) {
     FROM facilities f
     JOIN latest l ON l.facility_id = f.facility_id
     LEFT JOIN day_ago d ON d.facility_id = f.facility_id
+    WHERE ($1::int IS NULL OR f.facility_id = $1)
     ORDER BY occupancy DESC
-    LIMIT 5
-  `);
+  `, [facilityId]);
   json(res, rows);
 }
 
@@ -115,7 +136,7 @@ async function handleAlerts(res) {
       SELECT DISTINCT ON (fm.facility_id)
         fm.facility_id, fm.metric_value AS census
       FROM facility_metrics fm
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
       ORDER BY fm.facility_id, fm.source_update_date DESC
     ),
     occ AS (
@@ -149,63 +170,115 @@ async function handleAlerts(res) {
 }
 
 // ── /api/trend ────────────────────────────────────────────────────────────────
-async function handleTrend(res, days = 30) {
-  // Daily Total Census summed across all facilities
-  const { rows: actuals } = await pool.query(`
-    SELECT
-      TO_CHAR(DATE(source_update_date), 'Mon DD') AS date,
-      ROUND(SUM(avg_by_fac))::int                 AS actual
-    FROM (
+async function handleTrend(res, days = 30, facilityId = null) {
+  if (facilityId) {
+    const { rows } = await pool.query(`
+      WITH daily AS (
+        SELECT
+          DATE(source_update_date)  AS d,
+          AVG(fm.metric_value)::int AS total_census,
+          MAX(f.capacity)           AS capacity
+        FROM facility_metrics fm
+        JOIN facilities f ON f.facility_id = fm.facility_id
+        WHERE fm.facility_id = $2
+          AND LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          AND fm.source_update_date >= (
+            SELECT MAX(source_update_date) FROM facility_metrics
+            WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          ) - ($1 || ' days')::INTERVAL
+        GROUP BY DATE(source_update_date)
+      )
       SELECT
-        facility_id,
-        DATE(source_update_date) AS d,
-        AVG(metric_value)        AS avg_by_fac
-      FROM facility_metrics
-      WHERE metric = 'Total Census'
-        AND source_update_date >= (
-          SELECT MAX(source_update_date) FROM facility_metrics WHERE metric = 'Total Census'
-        ) - ($1 || ' days')::INTERVAL
-      GROUP BY facility_id, DATE(source_update_date)
-    ) sub
-    GROUP BY DATE(source_update_date)
-    ORDER BY DATE(source_update_date) ASC
+        TO_CHAR(d, 'Mon DD') AS date,
+        total_census         AS actual,
+        ROUND((total_census::numeric / NULLIF(capacity, 0)) * 100, 1)::float AS occupancy_pct
+      FROM daily
+      ORDER BY d ASC
+    `, [days, facilityId]);
+    return json(res, rows);
+  }
+  // All facilities
+  const { rows } = await pool.query(`
+    WITH daily AS (
+      SELECT
+        d,
+        ROUND(SUM(avg_by_fac))::int AS total_census
+      FROM (
+        SELECT
+          facility_id,
+          DATE(source_update_date) AS d,
+          AVG(metric_value)        AS avg_by_fac
+        FROM facility_metrics
+        WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          AND source_update_date >= (
+            SELECT MAX(source_update_date) FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+          ) - ($1 || ' days')::INTERVAL
+        GROUP BY facility_id, DATE(source_update_date)
+      ) sub
+      GROUP BY d
+    ),
+    cap AS (
+      SELECT SUM(capacity)::numeric AS total_capacity FROM facilities
+    )
+    SELECT
+      TO_CHAR(d, 'Mon DD') AS date,
+      total_census         AS actual,
+      ROUND((total_census / cap.total_capacity) * 100, 1)::float AS occupancy_pct
+    FROM daily, cap
+    ORDER BY d ASC
   `, [days]);
 
-  // Real forecast data
-  const { rows: forecasts } = await pool.query(`
-    SELECT
-      TO_CHAR(forecast_date, 'Mon DD') AS date,
-      predicted_census                 AS forecast,
-      confidence_lower                 AS lower,
-      confidence_upper                 AS upper
-    FROM forecast_data
-    WHERE hospital_id IS NULL
-      AND forecast_date >= CURRENT_DATE
-    ORDER BY forecast_date ASC
-  `);
-
-  const result = [...actuals];
-  if (result.length > 0 && forecasts.length > 0) {
-    result[result.length - 1].forecast = result[result.length - 1].actual;
-  }
-  result.push(...forecasts);
-  json(res, result);
+  json(res, rows);
 }
 
+// ── /api/auth/login ─────────────────────────────────────────────────────────
+// Note: Login, Users, Activity, and Logout handlers are defined below (HEAD versions with activity logging)
+
 // ── /api/forecast ─────────────────────────────────────────────────────────────
-async function handleForecast(res, days = 7) {
-  const { rows } = await pool.query(`
-    SELECT
-      TO_CHAR(forecast_date, 'Mon DD') AS date,
-      predicted_census                 AS predicted,
-      confidence_lower                 AS lower,
-      confidence_upper                 AS upper
-    FROM forecast_data
-    WHERE hospital_id IS NULL
-      AND forecast_date >= CURRENT_DATE
-      AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
-    ORDER BY forecast_date ASC
-  `, [days]);
+async function handleForecast(res, days = 7, facilityId = null) {
+  let rows;
+  if (facilityId) {
+    // Try facility-specific forecast first, fall back to system-wide
+    ({ rows } = await pool.query(`
+      SELECT
+        TO_CHAR(forecast_date, 'Mon DD') AS date,
+        predicted_census                 AS predicted,
+        confidence_lower                 AS lower,
+        confidence_upper                 AS upper
+      FROM forecast_data
+      WHERE hospital_id = $2
+        AND forecast_date >= CURRENT_DATE
+        AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
+      ORDER BY forecast_date ASC
+    `, [days, facilityId]));
+    if (rows.length === 0) {
+      ({ rows } = await pool.query(`
+        SELECT
+          TO_CHAR(forecast_date, 'Mon DD') AS date,
+          predicted_census                 AS predicted,
+          confidence_lower                 AS lower,
+          confidence_upper                 AS upper
+        FROM forecast_data
+        WHERE hospital_id IS NULL
+          AND forecast_date >= CURRENT_DATE
+          AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
+        ORDER BY forecast_date ASC
+      `, [days]));
+    }
+  } else {
+    ({ rows } = await pool.query(`
+      SELECT
+        TO_CHAR(forecast_date, 'Mon DD') AS date,
+        predicted_census                 AS predicted,
+        confidence_lower                 AS lower,
+        confidence_upper                 AS upper
+      FROM forecast_data
+      WHERE hospital_id IS NULL
+        AND forecast_date >= CURRENT_DATE
+        AND forecast_date < CURRENT_DATE + ($1 || ' days')::INTERVAL
+      ORDER BY forecast_date ASC
+    `, [days]));
+  }
 
   json(res, { data: rows, stats: { mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 } });
 }
@@ -570,6 +643,7 @@ const server = http.createServer(async (req, res) => {
   const days = parseInt(url.searchParams.get('days') ?? '30', 10);
   const action = url.searchParams.get('action') || 'all';
   const limit = parseInt(url.searchParams.get('limit') ?? '50', 10);
+  const facilityId = url.searchParams.get('facility_id') ? parseInt(url.searchParams.get('facility_id'), 10) : null;
 
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname}`);
 
@@ -581,7 +655,7 @@ const server = http.createServer(async (req, res) => {
           message: 'HCA Census API',
           version: '1.0.0',
           endpoints: {
-            GET: ['/census', '/facilities', '/alerts', '/trend', '/forecast', '/users', '/activity'],
+            GET: ['/census', '/facilities', '/facilitiesList', '/alerts', '/trend', '/forecast', '/users', '/activity'],
             POST: ['/users', '/auth/login', '/auth/logout'],
             DELETE: ['/users/:id']
           }
@@ -590,39 +664,52 @@ const server = http.createServer(async (req, res) => {
       }
     }
     
-    // GET endpoints
-    if (req.method === 'GET') {
-      if (path === '/census')     return await handleCensus(res);
-      if (path === '/facilities') return await handleFacilities(res);
-      if (path === '/alerts')     return await handleAlerts(res);
-      if (path === '/trend')      return await handleTrend(res, days);
-      if (path === '/forecast')   return await handleForecast(res, days);
-      if (path === '/users')      return await handleUsersGet(res);
-      if (path === '/activity')   return await handleActivity(res, action, limit);
+    // Auth endpoints (using HEAD versions with activity logging)
+    if (path === '/auth/login' && req.method === 'POST') {
+      const body = await readBody(req);
+      return await handleLogin(res, body);
+    }
+    if (path === '/auth/logout' && req.method === 'POST') {
+      const body = await readBody(req);
+      return await handleLogout(res, body);
     }
     
-    // POST endpoints
-    if (req.method === 'POST') {
-      if (path === '/users') {
-        const body = await readBody(req);
-        return await handleUsersPost(res, body);
-      }
-      if (path === '/auth/login') {
-        const body = await readBody(req);
-        return await handleLogin(res, body);
-      }
-      if (path === '/auth/logout') {
-        const body = await readBody(req);
-        return await handleLogout(res, body);
-      }
+    // User management endpoints (using HEAD versions)
+    if (path === '/users' && req.method === 'GET') {
+      return await handleUsersGet(res);
+    }
+    if (path === '/users' && req.method === 'POST') {
+      const body = await readBody(req);
+      return await handleUsersPost(res, body);
+    }
+    if (req.method === 'DELETE' && path.startsWith('/users/')) {
+      const userId = path.split('/')[2];
+      return await handleUsersDelete(res, userId);
     }
     
-    // DELETE endpoints
-    if (req.method === 'DELETE') {
-      if (path.startsWith('/users/')) {
-        const userId = path.split('/')[2];
-        return await handleUsersDelete(res, userId);
-      }
+    // Activity logs (using HEAD version)
+    if (path === '/activity' && req.method === 'GET') {
+      return await handleActivity(res, action, limit);
+    }
+    
+    // Data endpoints (supporting facilityId from main)
+    if (path === '/census' && req.method === 'GET') {
+      return await handleCensus(res, facilityId);
+    }
+    if (path === '/facilitiesList' && req.method === 'GET') {
+      return await handleFacilitiesList(res);
+    }
+    if (path === '/facilities' && req.method === 'GET') {
+      return await handleFacilities(res, facilityId);
+    }
+    if (path === '/alerts' && req.method === 'GET') {
+      return await handleAlerts(res);
+    }
+    if (path === '/trend' && req.method === 'GET') {
+      return await handleTrend(res, days, facilityId);
+    }
+    if (path === '/forecast' && req.method === 'GET') {
+      return await handleForecast(res, days, facilityId);
     }
     
     json(res, { 
@@ -630,7 +717,7 @@ const server = http.createServer(async (req, res) => {
       path: url.pathname,
       method: req.method,
       availableEndpoints: {
-        GET: ['/api/census', '/api/facilities', '/api/alerts', '/api/trend', '/api/forecast', '/api/users', '/api/activity'],
+        GET: ['/api/census', '/api/facilities', '/api/facilitiesList', '/api/alerts', '/api/trend', '/api/forecast', '/api/users', '/api/activity'],
         POST: ['/api/users', '/api/auth/login', '/api/auth/logout'],
         DELETE: ['/api/users/:id']
       }
@@ -643,7 +730,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n✅  API server running at http://localhost:${PORT}/api`);
-  console.log('   GET  /census  /facilities  /alerts  /trend?days=N  /forecast?days=N');
+  console.log('   GET  /census  /facilities  /facilitiesList  /alerts  /trend?days=N  /forecast?days=N');
   console.log('   GET  /users  /activity?action=signin&limit=50');
   console.log('   POST /users  /auth/login  /auth/logout');
   console.log('   DELETE /users/:id\n');

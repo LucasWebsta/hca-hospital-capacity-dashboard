@@ -1,4 +1,4 @@
-import { BarChart3, Bell, Settings, FileText, Home, Activity } from 'lucide-react';
+import { Bell, FileText, Home, Activity } from 'lucide-react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -14,7 +14,6 @@ const navItems = [
   { id: 'forecast', label: 'Forecast & Analysis', icon: Activity },
   { id: 'alerts', label: 'Alerts', icon: Bell },
   { id: 'reports', label: 'Reports', icon: FileText },
-  { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
@@ -27,21 +26,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     }}>
 
       {/* Logo */}
-      <div style={{ padding: '22px 20px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36,
-            background: BRAND_ORANGE,
-            borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 2px 12px rgba(231,89,37,0.5)`,
-          }}>
-            <BarChart3 size={18} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 0.8, color: '#fff', lineHeight: 1 }}>HCA</div>
-            <div style={{ fontSize: 10, color: '#7a9abd', marginTop: 2, letterSpacing: 0.5, fontWeight: 500 }}>Census Command</div>
-          </div>
-        </div>
+      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <img
+          src="/hca-logo.png"
+          alt="HCA Healthcare"
+          style={{ height: 52, width: 'auto', maxWidth: 210, objectFit: 'contain', display: 'block' }}
+        />
       </div>
 
       {/* Nav */}
@@ -84,21 +74,30 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       {/* Users */}
       <div style={{ padding: '10px 12px 20px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-        {/* Sarah Thompson */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, marginBottom: 2 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: BRAND_ORANGE,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
-            boxShadow: `0 1px 6px rgba(231,89,37,0.45)`,
-          }}>ST</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Sarah Thompson</div>
-            <div style={{ fontSize: 10.5, color: '#7a9abd' }}>Admin</div>
-          </div>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7a9abd" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
-        </div>
+        {/* Logged-in user */}
+        {(() => {
+          let user: { firstName?: string; lastName?: string; role?: string } | null = null;
+          try { const raw = sessionStorage.getItem('user'); user = raw ? JSON.parse(raw) : null; } catch {}
+          const initials = user ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() : 'HCA';
+          const fullName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : 'HCA Healthcare';
+          const role = user?.role ?? '';
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, marginBottom: 2 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%',
+                background: BRAND_ORANGE,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
+                boxShadow: `0 1px 6px rgba(231,89,37,0.45)`,
+              }}>{initials}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
+                <div style={{ fontSize: 10.5, color: '#7a9abd' }}>{role}</div>
+              </div>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7a9abd" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+          );
+        })()}
 
         {/* Emin Rantsra */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8 }}>

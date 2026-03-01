@@ -6,7 +6,8 @@
     "build": "tsc",
     "watch": "tsc -w",
     "start": "func start",
-    "dev": "npm run build && func start"
+    "dev": "npm run build && func start",
+    "local": "npm run build && node dev-server.js"
   },
   "dependencies": {
     "@azure/functions": "^4.0.0",
