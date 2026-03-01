@@ -6,6 +6,8 @@ import { MetricCard } from './MetricCard';
 import { OccupancyTrendChart } from './OccupancyTrendChart';
 import { ForecastOccupancyChart } from './ForecastOccupancyChart';
 import { FacilitiesAtRisk } from './FacilitiesAtRisk';
+import { FacilityMap } from './FacilityMap';
+import { ForecastMetricChart } from './ForecastMetricChart';
 import type {
   ReportConfig,
   ReportSnapshotData,
@@ -19,12 +21,15 @@ import type {
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
 
+// Section options match dashboard and forecast tab content
 const SECTION_OPTIONS: { id: ReportConfig['sections'][number]; label: string }[] = [
-  { id: 'overview', label: 'Overview metrics' },
+  { id: 'overview', label: 'Hospital System Overview' },
+  { id: 'map', label: 'Facility Network' },
   { id: 'trend', label: 'Occupancy trend' },
   { id: 'forecast', label: 'Forecast' },
-  { id: 'facilities', label: 'Facilities at risk' },
-  { id: 'alerts', label: 'Alerts summary' },
+  { id: 'forecastMetric', label: 'Metric forecast (Seasonality-Adjusted)' },
+  { id: 'facilities', label: 'Top Facilities at Risk' },
+  { id: 'alerts', label: 'Alerts' },
 ];
 
 const TREND_DAYS_OPTIONS = [7, 14, 30];
@@ -46,13 +51,14 @@ export function ReportsPanel() {
     facilityId: null,
     facilityName: 'All Facilities',
     trendDays: 30,
-    sections: ['overview', 'trend', 'forecast', 'facilities', 'alerts'],
+    sections: ['overview', 'map', 'trend', 'forecast', 'facilities', 'alerts'],
   });
   const [snapshot, setSnapshot] = useState<{ config: ReportConfig; data: ReportSnapshotData; created_at: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [snapshotCopied, setSnapshotCopied] = useState(false);
   const [snapshotSaving, setSnapshotSaving] = useState(false);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [reportMetric, setReportMetric] = useState<string>('Admissions');
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Load facilities for dropdown
@@ -84,7 +90,7 @@ export function ReportsPanel() {
           trendDays: days ? parseInt(days, 10) : c.trendDays,
           sections: sections
             ? (sections.split(',').filter((x): x is ReportConfig['sections'][number] =>
-                ['overview', 'trend', 'forecast', 'facilities', 'alerts'].includes(x)) as ReportConfig['sections'][number][])
+                ['overview', 'map', 'trend', 'forecast', 'forecastMetric', 'facilities', 'alerts'].includes(x)) as ReportConfig['sections'][number][])
             : c.sections,
         }));
       }
@@ -162,12 +168,7 @@ export function ReportsPanel() {
 
   return (
     <div className="reports-page" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', letterSpacing: -0.3 }}>Reports</div>
-        <div style={{ fontSize: 12.5, color: '#475569', marginTop: 3, fontWeight: 500 }}>
-          Configure your report, then export as PDF, share a link, or save a snapshot.
-        </div>
-      </div>
+      
 
       {isSnapshotView && snapshot && (
         <div style={{
@@ -331,12 +332,21 @@ export function ReportsPanel() {
           </div>
 
           {config.sections.includes('overview') && (
-            <Section title="Overview">
+            <Section title="Hospital System Overview">
               {isSnapshotView && data?.census ? (
                 <OverviewBlock census={data.census} />
               ) : (
                 <LiveOverview facilityId={config.facilityId} facilityName={config.facilityName} />
               )}
+            </Section>
+          )}
+
+          {config.sections.includes('map') && (
+            <Section title="Facility Network">
+              <FacilityMap
+                selectedFacilityId={config.facilityId}
+                onFacilitySelect={(id, name) => handleConfigChange({ facilityId: id, facilityName: name })}
+              />
             </Section>
           )}
 
@@ -360,8 +370,19 @@ export function ReportsPanel() {
             </Section>
           )}
 
+          {config.sections.includes('forecastMetric') && (
+            <Section title="Metric forecast (Seasonality-Adjusted)">
+              <ForecastMetricChart
+                facilityId={config.facilityId}
+                metric={reportMetric}
+                onMetricChange={setReportMetric}
+                compact
+              />
+            </Section>
+          )}
+
           {config.sections.includes('facilities') && (
-            <Section title="Facilities at risk">
+            <Section title="Top Facilities at Risk">
               {isSnapshotView && data?.facilities ? (
                 <FacilitiesBlock facilities={data.facilities} />
               ) : (
@@ -371,7 +392,7 @@ export function ReportsPanel() {
           )}
 
           {config.sections.includes('alerts') && (
-            <Section title="Alerts summary">
+            <Section title="Alerts">
               {isSnapshotView && data?.alerts ? (
                 <AlertsBlock alerts={data.alerts} />
               ) : (
