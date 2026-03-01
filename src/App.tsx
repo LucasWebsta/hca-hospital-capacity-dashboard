@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   Header,
@@ -13,8 +14,22 @@ import { api } from "./api";
 import type { CensusMetrics } from "./api";
 import "./App.css";
 
+function pathnameToTab(pathname: string): string {
+  if (pathname === "/" || pathname === "") return "dashboard";
+  const segment = pathname.replace(/^\//, "").split("/")[0];
+  return segment || "dashboard";
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = pathnameToTab(location.pathname);
+
+  const setActiveTab = (tab: string) => {
+    if (tab === "dashboard") navigate("/");
+    else navigate("/" + tab);
+  };
+
   const [trendDays, setTrendDays] = useState(30);
   const [census, setCensus] = useState<CensusMetrics>({
     totalCensus: 948,
@@ -51,12 +66,11 @@ function App() {
         <Header
           trendDays={trendDays}
           onTrendDaysChange={setTrendDays}
-          onAlertsClick={() => setActiveTab("alerts")}
+          onAlertsClick={() => navigate("/alerts")}
         />
 
         {activeTab === "dashboard" && (
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
-            {/* Page heading */}
             <div style={{ marginBottom: 20 }}>
               <div
                 style={{
@@ -88,11 +102,9 @@ function App() {
                 maxWidth: 1440,
               }}
             >
-              {/* LEFT COLUMN */}
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 20 }}
               >
-                {/* Overview card with metrics */}
                 <div
                   style={{
                     background: "#fff",
@@ -196,15 +208,9 @@ function App() {
                     />
                   </div>
                 </div>
-
-                {/* Occupancy Trend chart */}
                 <OccupancyTrendChart days={trendDays} />
-
-                {/* Facilities table */}
                 <FacilitiesAtRisk />
               </div>
-
-              {/* RIGHT COLUMN */}
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 20 }}
               >
@@ -215,33 +221,65 @@ function App() {
           </div>
         )}
 
-        {activeTab !== "dashboard" && (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <div style={{ textAlign: "center" }}>
-              <h3
+        {activeTab === "forecast" && <ForecastPage />}
+
+        {activeTab === "alerts" && (
+          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
+            <div style={{ marginBottom: 20 }}>
+              <div
                 style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: "#111827",
-                  marginBottom: 8,
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  letterSpacing: -0.3,
                 }}
               >
-                {activeTab === "forecast" && <ForecastPage />}
-                {activeTab === "alerts" && "Alerts & Notifications"}
-                {activeTab === "settings" && "Settings"}
-                {activeTab === "reports" && "Reports"}
-              </h3>
-              <p style={{ color: "#6b7280" }}>Coming soon...</p>
+                Alerts & Notifications
+              </div>
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "#94a3b8",
+                  marginTop: 3,
+                  fontWeight: 500,
+                }}
+              >
+                Create and manage your alert rules
+              </div>
+            </div>
+            <div style={{ width: "100%" }}>
+              <AlertsPanel />
             </div>
           </div>
         )}
+
+        {activeTab !== "dashboard" &&
+          activeTab !== "alerts" &&
+          activeTab !== "forecast" && (
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div style={{ textAlign: "center" }}>
+                <h3
+                  style={{
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: "#111827",
+                    marginBottom: 8,
+                  }}
+                >
+                  {activeTab === "settings" && "Settings"}
+                  {activeTab === "reports" && "Reports"}
+                </h3>
+                <p style={{ color: "#6b7280" }}>Coming soon...</p>
+              </div>
+            </div>
+          )}
       </div>
     </div>
   );

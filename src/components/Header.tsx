@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Bell } from 'lucide-react';
+import { ChevronDown, Bell, LogOut, User } from 'lucide-react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -13,11 +13,17 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-const FACILITIES = [
-  'All Facilities',
-  'Savannah, GA', 'Augusta, GA', 'Macon, GA', 'Columbus, GA',
-  'Atlanta, GA', 'Athens, GA', 'Albany, GA', 'Rome, GA', 'Valdosta, GA', 'Brunswick, GA',
-];
+function getSessionUser(): { firstName: string; lastName: string; role: string } | null {
+  try {
+    const raw = sessionStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function getInitials(user: { firstName: string; lastName: string } | null): string {
+  if (!user) return 'HCA';
+  return `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
+}
 
 const TREND_DAYS: { label: string; value: number }[] = [
   { label: 'Last 7 days', value: 7 },
@@ -76,6 +82,19 @@ function Dropdown({ label, options, onSelect }: {
 }
 
 export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderProps) {
+  const [facilityNames, setFacilityNames] = useState<string[]>(['All Facilities']);
+  const sessionUser = getSessionUser();
+  const initials = getInitials(sessionUser);
+
+  useEffect(() => {
+    fetch('/api/facilities')
+      .then(r => r.json())
+      .then((data: { name: string }[]) => {
+        setFacilityNames(['All Facilities', ...data.map(f => f.name)]);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div style={{
       background: '#fff',
@@ -90,7 +109,7 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderPr
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Dropdown
           label="All Facilities"
-          options={FACILITIES}
+          options={facilityNames}
           onSelect={() => {}}
         />
       </div>
@@ -125,15 +144,91 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderPr
           }} />
         </button>
 
-        {/* Avatar */}
-        <div style={{
+        {/* Avatar + profile dropdown */}
+        <AvatarMenu initials={initials} sessionUser={sessionUser} />
+      </div>
+    </div>
+  );
+}
+
+function AvatarMenu({ initials, sessionUser }: {
+  initials: string;
+  sessionUser: { firstName: string; lastName: string; role: string } | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  function handleLogout() {
+    sessionStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  const fullName = sessionUser ? `${sessionUser.firstName} ${sessionUser.lastName}` : 'User';
+  const role = sessionUser?.role ?? '';
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        title={fullName}
+        style={{
           width: 32, height: 32, borderRadius: '50%',
           background: BRAND_BLUE,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
           boxShadow: `0 1px 6px rgba(9,34,64,0.3)`,
-        }}>ST</div>
-      </div>
+        }}
+      >{initials}</div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 999,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.13)', minWidth: 200, padding: '6px 0',
+        }}>
+          {/* User info header */}
+          <div style={{ padding: '10px 16px 8px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{fullName}</div>
+            <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>{role}</div>
+          </div>
+
+          {/* Profile */}
+          <button
+            onClick={() => setOpen(false)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '9px 16px',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 13, color: '#374151', textAlign: 'left',
+            }}
+          >
+            <User size={15} color="#6b7280" />
+            Profile
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '9px 16px',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 13, color: '#dc2626', textAlign: 'left',
+            }}
+          >
+            <LogOut size={15} color="#dc2626" />
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }
