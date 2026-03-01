@@ -20,9 +20,9 @@ export async function loginHandler(
 
     const db = getDb();
     const { rows } = await db.query(
-      `SELECT id, first_name, last_name, email, role, status, password_hash
+      `SELECT id, first_name, last_name, email, role, password_hash
        FROM users
-       WHERE email = $1 AND status = 'Active'`,
+       WHERE email = $1`,
       [email.toLowerCase()]
     );
 
@@ -149,7 +149,4 @@ app.http('auth-logout', {
   route: 'auth/logout',
   handler: logoutHandler,
 });
-
-// Export handlers for use in server.js
-export { loginHandler, logoutHandler };
 

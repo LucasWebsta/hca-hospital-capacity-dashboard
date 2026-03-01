@@ -4,6 +4,18 @@
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
+/** Current user id from session (set by login page). Used for user-scoped alert rules. */
+function getCurrentUserId(): number | null {
+  try {
+    const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('user') : null;
+    if (!raw) return null;
+    const user = JSON.parse(raw) as { id?: number };
+    return user?.id != null ? user.id : null;
+  } catch {
+    return null;
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
@@ -97,14 +109,35 @@ export const api = {
   getForecast:      (days = 7)  => get<ForecastResponse>(`/forecast?days=${days}`),
   getFacilitiesList: () => get<FacilityListItem[]>('/facilitiesList'),
   getMetricTypes:   () => get<string[]>('/metricTypes'),
-  getAlertRules:    () => get<AlertRule[]>('/alertRules'),
-  createAlertRule:  (payload: CreateAlertRulePayload) =>
-    fetch(`${BASE}/alertRulesPost`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(async (r) => {
+  getAlertRules:    () => {
+    const uid = getCurrentUserId();
+    const headers: Record<string, string> = {};
+    if (uid != null) headers['X-User-Id'] = String(uid);
+    return fetch(`${BASE}/alertRules`, { headers }).then(async (r) => {
       if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json() as Promise<AlertRule[]>;
+    });
+  },
+  createAlertRule:  (payload: CreateAlertRulePayload) => {
+    const uid = getCurrentUserId();
+    if (uid == null) return Promise.reject(new Error('Login required to create alert rules'));
+    return fetch(`${BASE}/alertRulesPost`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': String(uid) },
+      body: JSON.stringify(payload),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
       return r.json() as Promise<AlertRule>;
-    }),
-  deleteAlertRule:  (id: number) =>
-    fetch(`${BASE}/alertRulesDelete?id=${id}`, { method: 'DELETE' }).then((r) => {
+    });
+  },
+  deleteAlertRule:  (id: number) => {
+    const uid = getCurrentUserId();
+    if (uid == null) return Promise.reject(new Error('Login required to delete alert rules'));
+    return fetch(`${BASE}/alertRulesDelete?id=${id}`, {
+      method: 'DELETE',
+      headers: { 'X-User-Id': String(uid) },
+    }).then((r) => {
       if (!r.ok && r.status !== 204) throw new Error(`API error ${r.status}`);
-    }),
+    });
+  },
 };
