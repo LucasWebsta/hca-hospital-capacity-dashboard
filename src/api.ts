@@ -97,6 +97,33 @@ export interface CreateAlertRulePayload {
   window_minutes?: number;
 }
 
+/** Report configuration (facility, days, sections to include) */
+export interface ReportConfig {
+  facilityId: number | null;
+  facilityName: string;
+  trendDays: number;
+  sections: ('overview' | 'trend' | 'forecast' | 'facilities' | 'alerts')[];
+}
+
+/** Snapshot data: census, trend, forecast, facilities, alerts */
+export interface ReportSnapshotData {
+  census: CensusMetrics | null;
+  trend: TrendPoint[];
+  forecast: ForecastResponse | null;
+  facilities: Facility[];
+  alerts: Alert[];
+  capturedAt: string; // ISO
+}
+
+/** Saved report snapshot from API */
+export interface ReportSnapshot {
+  id: string;
+  title?: string | null;
+  config: ReportConfig;
+  data: ReportSnapshotData;
+  created_at: string;
+}
+
 // ─────────────────────────────────────────────
 // API calls
 // ─────────────────────────────────────────────
@@ -138,6 +165,25 @@ export const api = {
       headers: { 'X-User-Id': String(uid) },
     }).then((r) => {
       if (!r.ok && r.status !== 204) throw new Error(`API error ${r.status}`);
+    });
+  },
+
+  getReportSnapshot:  (id: string) =>
+    fetch(`${BASE}/reportSnapshots/${id}`).then(async (r) => {
+      if (!r.ok) throw new Error(r.status === 404 ? 'Snapshot not found' : `API error ${r.status}`);
+      return r.json() as Promise<ReportSnapshot>;
+    }),
+  createReportSnapshot: (payload: { title?: string; config: ReportConfig; data: ReportSnapshotData }) => {
+    const uid = getCurrentUserId();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (uid != null) headers['X-User-Id'] = String(uid);
+    return fetch(`${BASE}/reportSnapshots`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ id: string; created_at: string }>;
     });
   },
 };

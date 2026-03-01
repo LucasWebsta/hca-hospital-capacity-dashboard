@@ -380,6 +380,44 @@ const server = http.createServer(async (req, res) => {
       return send(res, 201, rows[0]);
     }
 
+    // GET /api/reportSnapshots/:id — load a saved report snapshot (no auth required for viewing)
+    if (base.startsWith('reportSnapshots/') && method === 'GET') {
+      const id = base.slice('reportSnapshots/'.length);
+      if (!id) return send(res, 400, { error: 'Snapshot id required' });
+      try {
+        const { rows } = await db.query(
+          'SELECT id, title, config, data, created_at FROM report_snapshots WHERE id = $1',
+          [id]
+        );
+        if (rows.length === 0) return send(res, 404, { error: 'Snapshot not found' });
+        const r = rows[0];
+        return send(res, 200, { id: r.id, title: r.title, config: r.config, data: r.data, created_at: r.created_at });
+      } catch (e) {
+        if (e.code === '42P01') return send(res, 404, { error: 'Snapshot not found' });
+        throw e;
+      }
+    }
+
+    // POST /api/reportSnapshots — save a report snapshot (X-User-Id optional but recommended)
+    if (base === 'reportSnapshots' && method === 'POST') {
+      const userId = req.headers['x-user-id'] || null;
+      try {
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const { title, config, data } = body;
+        if (!config || !data) return send(res, 400, { error: 'config and data are required' });
+        const id = require('crypto').randomBytes(12).toString('base64url');
+        await db.query(
+          'INSERT INTO report_snapshots (id, user_id, title, config, data) VALUES ($1, $2, $3, $4, $5)',
+          [id, userId, title || null, JSON.stringify(config), JSON.stringify(data)]
+        );
+        return send(res, 201, { id, created_at: new Date().toISOString() });
+      } catch (e) {
+        if (e.code === '42P01') return send(res, 500, { error: 'Report snapshots not available. Run db/schema-report-snapshots.sql.' });
+        throw e;
+      }
+    }
+
     // DELETE /api/alertRulesDelete — only delete rules owned by current user
     if (base === 'alertRulesDelete' && method === 'DELETE') {
       const id = query.get('id');

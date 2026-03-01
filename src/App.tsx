@@ -8,6 +8,7 @@ import {
   ForecastOccupancyChart,
   FacilitiesAtRisk,
   AlertsPanel,
+  ReportsPanel,
 } from './components';
 import { api } from './api';
 import type { CensusMetrics } from './api';
@@ -136,13 +137,18 @@ function App() {
           </div>
         )}
 
-        {activeTab !== 'dashboard' && activeTab !== 'alerts' && (
+        {activeTab === 'reports' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }} className="reports-print-container">
+            <ReportsPanel />
+          </div>
+        )}
+
+        {activeTab !== 'dashboard' && activeTab !== 'alerts' && activeTab !== 'reports' && (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ textAlign: 'center' }}>
               <h3 style={{ fontSize: 22, fontWeight: 700, color: '#111827', marginBottom: 8 }}>
                 {activeTab === 'forecast' && 'Forecast & Analysis'}
                 {activeTab === 'settings' && 'Settings'}
-                {activeTab === 'reports' && 'Reports'}
               </h3>
               <p style={{ color: '#6b7280' }}>Coming soon...</p>
             </div>

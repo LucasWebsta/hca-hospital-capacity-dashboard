@@ -2,3 +2,28 @@
   width: 100%;
   height: 100%;
 }
+
+/* Print: show only report content when on Reports page */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #report-content,
+  #report-content * {
+    visibility: visible;
+  }
+  #report-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none;
+    padding: 0;
+    box-shadow: none;
+    border: none;
+    background: #fff;
+  }
+  .reports-print-container {
+    padding: 0 !important;
+  }
+}
