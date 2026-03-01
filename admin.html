@@ -111,8 +111,8 @@
                         <p class="text-sm text-gray-600">Logged in as</p>
                         <p class="font-semibold text-gray-900" id="loggedInUser">Kevin</p>
                     </div>
-                    <div class="w-12 h-12 bg-brand-blue rounded-full flex items-center justify-center text-white font-bold" id="userInitials" style="background-color: #092240;">
-                        K
+                    <div class="w-12 h-12 bg-brand-blue rounded-full flex items-center justify-center text-white font-bold overflow-hidden" id="userAvatar" style="background-color: #092240;">
+                        <span id="userInitials">K</span>
                     </div>
                     <button
                         onclick="handleLogout()"
@@ -826,21 +826,35 @@
         }
 
 
-        // Set logged in user name
+        // Set logged in user name and profile picture
         (function() {
             const userStr = sessionStorage.getItem('user');
             if (userStr) {
                 const user = JSON.parse(userStr);
                 const userNameEl = document.getElementById('loggedInUser');
                 const userInitialsEl = document.getElementById('userInitials');
+                const userAvatarEl = document.getElementById('userAvatar');
+                
                 if (userNameEl) {
                     userNameEl.textContent = `${user.firstName} ${user.lastName}`;
                 }
-                if (userInitialsEl) {
+                
+                if (userAvatarEl) {
                     const first = (user.firstName && String(user.firstName).trim()[0]) || '';
                     const last = (user.lastName && String(user.lastName).trim()[0]) || '';
                     const initials = (first + last).toUpperCase() || (user.email && user.email[0]) || '?';
-                    userInitialsEl.textContent = initials;
+                    
+                    if (user.photoUrl) {
+                        // Show profile picture
+                        userAvatarEl.innerHTML = `<img src="${user.photoUrl}" alt="${user.firstName} ${user.lastName}" style="width: 100%; height: 100%; object-fit: cover;" referrerPolicy="no-referrer" />`;
+                    } else {
+                        // Show initials
+                        if (userInitialsEl) {
+                            userInitialsEl.textContent = initials;
+                        } else {
+                            userAvatarEl.textContent = initials;
+                        }
+                    }
                 }
             }
         })();

@@ -48,7 +48,7 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
     () => localStorage.getItem('homeLocation') ?? 'all'
   );
   const [profilePicture, setProfilePicture] = useState<string | null>(
-    () => localStorage.getItem('profilePicture') ?? sessionUser?.photoUrl ?? null
+    () => sessionUser?.photoUrl ?? null
   );
   const [notifications, setNotifications] = useState({
     email: localStorage.getItem('notifEmail') !== 'false',
@@ -92,13 +92,43 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
     reader.onload = ev => {
       const result = ev.target?.result as string;
       setProfilePicture(result);
-      localStorage.setItem('profilePicture', result);
     };
     reader.readAsDataURL(file);
   }
 
   async function handleSave() {
     const userId = sessionUser?.id != null ? Number(sessionUser.id) : null;
+    
+    // Save profile picture to database if changed
+    if (profilePicture !== sessionUser?.photoUrl && userId != null) {
+      try {
+        const API_BASE = window.location.protocol === 'file:' 
+          ? 'http://localhost:7071/api'
+          : '/api';
+        
+        const response = await fetch(`${API_BASE}/users/${userId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ photoUrl: profilePicture || null }),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to update profile picture');
+        }
+        
+        const updatedUser = await response.json();
+        // Update sessionStorage with new photoUrl
+        const currentUser = JSON.parse(sessionStorage.getItem('user') || '{}');
+        currentUser.photoUrl = updatedUser.photoUrl;
+        sessionStorage.setItem('user', JSON.stringify(currentUser));
+      } catch (error) {
+        console.error('Error saving profile picture:', error);
+        alert('Failed to save profile picture. Please try again.');
+        return;
+      }
+    }
+    
+    // Update email and phone number if changed
     if (userId != null && !Number.isNaN(userId) && (email.trim() !== (sessionUser?.email ?? '') || phoneNumber.trim() !== (sessionUser?.phoneNumber ?? (sessionUser as { phone_number?: string })?.phone_number ?? ''))) {
       try {
         const updated = await api.updateMyProfile(userId, {
@@ -134,7 +164,8 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
         if (match) onFacilityChange(match.id, match.name);
       }
     }
-    onClose();
+    // Reload page to refresh profile picture in Header and Sidebar
+    window.location.reload();
   }
 
   function handleCancel() {

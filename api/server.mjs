@@ -526,6 +526,51 @@ async function handleUserById(req, res, id) {
       return json(res, { error: 'Failed to delete user' }, 500);
     }
   }
+  
+  if (req.method === 'PUT' || req.method === 'PATCH') {
+    try {
+      let body = '';
+      for await (const chunk of req) body += chunk;
+      const data = JSON.parse(body || '{}');
+      
+      // Build update query dynamically based on provided fields
+      const updates = [];
+      const values = [];
+      let paramIndex = 1;
+      
+      if (data.photoUrl !== undefined) {
+        updates.push(`photo_url = $${paramIndex++}`);
+        values.push(data.photoUrl);
+      }
+      
+      if (updates.length === 0) {
+        return json(res, { error: 'No fields to update' }, 400);
+      }
+      
+      values.push(id);
+      const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex} RETURNING id, first_name, last_name, email, role, photo_url`;
+      
+      const { rows } = await pool.query(query, values);
+      
+      if (rows.length === 0) {
+        return json(res, { error: 'User not found' }, 404);
+      }
+      
+      const user = rows[0];
+      return json(res, {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+        role: user.role,
+        photoUrl: user.photo_url,
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return json(res, { error: 'Failed to update user' }, 500);
+    }
+  }
+  
   json(res, { error: 'Method not allowed' }, 405);
 }
 
@@ -634,7 +679,7 @@ async function handleForecast(res, days = 7, facilityId = null) {
 // ── Router ────────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' });
     res.end();
     return;
   }
@@ -645,13 +690,17 @@ const server = http.createServer(async (req, res) => {
   const facilityId = url.searchParams.get('facility_id') ? parseInt(url.searchParams.get('facility_id'), 10) : null;
   const userId = req.headers['x-user-id'] ?? null;
 
-  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname}`);
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname} (path: ${path})`);
 
   try {
     if (path === '/auth/login' && req.method === 'POST') return await handleLogin(req, res);
     if (path === '/auth/logout' && req.method === 'POST') return await handleLogout(req, res);
     if (path === '/users' && (req.method === 'GET' || req.method === 'POST')) return await handleUsers(req, res);
-    if (/^\/users\/\d+$/.test(path)) return await handleUserById(req, res, path.split('/')[2]);
+    const userByIdMatch = path.match(/^\/users\/(\d+)$/);
+    if (userByIdMatch && (req.method === 'DELETE' || req.method === 'PUT' || req.method === 'PATCH')) {
+      console.log(`  Matched userById route: id=${userByIdMatch[1]}, method=${req.method}`);
+      return await handleUserById(req, res, userByIdMatch[1]);
+    }
     if (path === '/activity') return await handleActivity(req, res, url.searchParams);
     if (path === '/census')          return await handleCensus(res, facilityId);
     if (path === '/facilitiesList')  return await handleFacilitiesList(res);
