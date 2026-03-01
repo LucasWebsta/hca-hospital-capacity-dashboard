@@ -163,6 +163,31 @@ export interface ReportSnapshot {
 // API calls
 // ─────────────────────────────────────────────
 
+// Debounce notifyAlerts so AlertsPanel + AlertsWidget don't both trigger a send
+let notifyAlertsTimer: ReturnType<typeof setTimeout> | null = null;
+let notifyAlertsPending: { userId: number; alerts: Alert[] } | null = null;
+function notifyAlertsDebounced(userId: number, alerts: Alert[]): Promise<{ sentEmail: boolean; sentSms: boolean; cooldown?: boolean }> {
+  notifyAlertsPending = { userId, alerts };
+  if (notifyAlertsTimer != null) clearTimeout(notifyAlertsTimer);
+  notifyAlertsTimer = setTimeout(() => {
+    notifyAlertsTimer = null;
+    const p = notifyAlertsPending;
+    notifyAlertsPending = null;
+    if (!p || p.alerts.length === 0) return;
+    fetch(`${BASE}/alerts/notify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: p.userId, alerts: p.alerts }),
+    })
+      .then(async (r) => {
+        if (!r.ok) return { sentEmail: false, sentSms: false };
+        return r.json() as Promise<{ sentEmail: boolean; sentSms: boolean; cooldown?: boolean }>;
+      })
+      .catch(() => ({ sentEmail: false, sentSms: false }));
+  }, 1500);
+  return Promise.resolve({ sentEmail: false, sentSms: false });
+}
+
 export const api = {
   getCensusMetrics: (facilityId?: number) => get<CensusMetrics>(facilityId ? `/census?facility_id=${facilityId}` : '/census'),
   getFacilities:    (facilityId?: number) => get<Facility[]>(facilityId ? `/facilities?facility_id=${facilityId}` : '/facilities'),
@@ -264,17 +289,10 @@ export const api = {
       return r.json() as Promise<{ notifyEmail?: boolean; notifySms?: boolean }>;
     }),
 
-  /** Request email/SMS delivery for active alerts (respects user prefs and cooldown on server). */
+  /** Request email/SMS delivery for active alerts (respects user prefs, cooldown, and "new alerts only" on server). Debounced so multiple panels don't double-send. */
   notifyAlerts: (alerts: Alert[]) => {
     const uid = getCurrentUserId();
     if (uid == null || alerts.length === 0) return Promise.resolve({ sentEmail: false, sentSms: false });
-    return fetch(`${BASE}/alerts/notify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: uid, alerts }),
-    }).then(async (r) => {
-      if (!r.ok) return { sentEmail: false, sentSms: false };
-      return r.json() as Promise<{ sentEmail: boolean; sentSms: boolean; cooldown?: boolean }>;
-    });
+    return notifyAlertsDebounced(uid, alerts);
   },
 };

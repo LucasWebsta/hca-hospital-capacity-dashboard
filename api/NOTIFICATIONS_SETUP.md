@@ -74,6 +74,7 @@ Real email is sent via [Resend](https://resend.com). Without `RESEND_API_KEY`, t
 
 ---
 
-## Cooldown
+## When notifications are sent
 
-Each user is limited to one notification batch (email + SMS) per **15 minutes** to avoid spam when the app polls alerts repeatedly.
+- **New alerts only:** Email/SMS is sent only when there is at least one **new** active alert (one that wasn’t in the last batch we notified for). If the same alerts are still active and the app fetches again, no second email is sent.
+- **Cooldown:** Each user is limited to one notification batch per **15 minutes**. So even if new alerts appear, you won’t get more than one email/SMS per 15 minutes.

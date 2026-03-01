@@ -24,6 +24,8 @@ const PORT = 7071;
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 const NOTIFY_COOLDOWN_MS = 15 * 60 * 1000; // 15 min between alert notifications per user
 const lastNotifyByUser = new Map();
+/** Per user: set of alert ids we already sent (only send when there are new ids). */
+const lastNotifiedAlertIdsByUser = new Map();
 
 /** Normalize to E.164 for US: +1 + 10 digits. Returns null if not valid. */
 function toE164(phone) {
@@ -424,6 +426,11 @@ const server = http.createServer(async (req, res) => {
         const now = Date.now();
         const last = lastNotifyByUser.get(userId) || 0;
         if (alerts.length === 0) return send(res, 200, { sentEmail: false, sentSms: false });
+        // Stable id per alert (facility-based; use id + message in case shape changes)
+        const currentIds = new Set(alerts.map(a => `${a.id ?? ''}_${a.message ?? ''}`));
+        const lastNotified = lastNotifiedAlertIdsByUser.get(userId) || new Set();
+        const hasNew = [...currentIds].some(id => !lastNotified.has(id));
+        if (!hasNew) return send(res, 200, { sentEmail: false, sentSms: false, noNewAlerts: true });
         if (now - last < NOTIFY_COOLDOWN_MS) return send(res, 200, { sentEmail: false, sentSms: false, cooldown: true });
 
         const { rows } = await db.query(
@@ -453,7 +460,10 @@ const server = http.createServer(async (req, res) => {
             console.log('[alerts/notify] SMS skipped: invalid phone number', user.phone_number);
           }
         }
-        if (sentEmail || sentSms) lastNotifyByUser.set(userId, now);
+        if (sentEmail || sentSms) {
+          lastNotifyByUser.set(userId, now);
+          lastNotifiedAlertIdsByUser.set(userId, new Set(currentIds));
+        }
         return send(res, 200, { sentEmail, sentSms });
       } catch (err) {
         console.error('POST alerts/notify error:', err);
