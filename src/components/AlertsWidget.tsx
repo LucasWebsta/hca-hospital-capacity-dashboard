@@ -34,7 +34,11 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
     setLoading(true);
     setError(null);
     api.getAlerts()
-      .then(data => { setAlerts(data); setError(null); })
+      .then(data => {
+        setAlerts(data);
+        setError(null);
+        if (data && data.length > 0) api.notifyAlerts(data).catch(() => {});
+      })
       .catch(e => setError(e?.message ?? 'Failed to load alerts'))
       .finally(() => setLoading(false));
   };
