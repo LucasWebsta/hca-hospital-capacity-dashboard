@@ -377,11 +377,10 @@
         // Load activity logs from API
         async function loadActivityLogs(filter = 'all') {
             try {
-                // For failed_login filter, we need to load all logs and filter client-side
-                // since failed logins are stored with action='signin' but have special user_name format
+                // For failed_login, we need to load all logs to catch both old format (action='signin' with FAILED_LOGIN: prefix)
+                // and new format (action='failed_login')
                 let url;
                 if (filter === 'failed_login') {
-                    // Load all logs to filter for failed logins client-side
                     url = `${API_BASE}/activity?limit=100`;
                 } else if (filter === 'all') {
                     url = `${API_BASE}/activity?limit=50`;
@@ -456,24 +455,30 @@
 
         function renderLogs(filter = 'all') {
             const container = document.getElementById('logsContainer');
+            if (!container) {
+                console.error('logsContainer not found');
+                return;
+            }
+            
             let filteredLogs = [...activityLogs];
             
             if (filter === 'failed_login') {
-                // Filter for failed login attempts (user_name starts with "FAILED_LOGIN:")
+                // Filter for failed login attempts - handle both old format (action='signin' with FAILED_LOGIN: prefix)
+                // and new format (action='failed_login')
                 filteredLogs = filteredLogs.filter(log => {
                     const userName = log.user_name || log.userName || '';
-                    return userName.startsWith('FAILED_LOGIN:');
+                    return log.action === 'failed_login' || 
+                           (log.action === 'signin' && userName.startsWith('FAILED_LOGIN:'));
+                });
+            } else if (filter === 'signin') {
+                // For signin filter, exclude failed login attempts (both old and new format)
+                filteredLogs = filteredLogs.filter(log => {
+                    const userName = log.user_name || log.userName || '';
+                    return log.action === 'signin' && !userName.startsWith('FAILED_LOGIN:');
                 });
             } else if (filter !== 'all') {
-                // Filter by action type, but exclude failed logins from regular signin filter
-                if (filter === 'signin') {
-                    filteredLogs = filteredLogs.filter(log => {
-                        const userName = log.user_name || log.userName || '';
-                        return log.action === filter && !userName.startsWith('FAILED_LOGIN:');
-                    });
-                } else {
-                    filteredLogs = filteredLogs.filter(log => log.action === filter);
-                }
+                // Filter by action type
+                filteredLogs = filteredLogs.filter(log => log.action === filter);
             }
 
             // Sort by timestamp (newest first) - already sorted by API, but ensure it
@@ -490,30 +495,34 @@
                 const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const isSignIn = log.action === 'signin';
                 const userName = log.user_name || log.userName || 'Unknown';
+                // Check if this is a failed login (new format: action='failed_login' or old format: action='signin' with FAILED_LOGIN: prefix)
+                const isFailedLogin = log.action === 'failed_login' || (log.action === 'signin' && userName.startsWith('FAILED_LOGIN:'));
                 
-                // Check if this is a failed login attempt
-                const isFailedLogin = userName.startsWith('FAILED_LOGIN:');
                 let displayName = userName;
-                let displayAction = isSignIn ? 'Signed in' : 'Signed out';
-                let bgColor = isSignIn ? 'bg-green-500' : 'bg-red-500';
+                let displayAction = isSignIn && !isFailedLogin ? 'Signed in' : isFailedLogin ? 'Failed login attempt' : 'Signed out';
+                let bgColor = isSignIn && !isFailedLogin ? 'bg-green-500' : isFailedLogin ? 'bg-orange-500' : 'bg-red-500';
                 
                 if (isFailedLogin) {
-                    // Parse failed login: "FAILED_LOGIN: email:password"
-                    const parts = userName.replace('FAILED_LOGIN: ', '').split(':');
+                    // Parse failed login - handle both formats
+                    let emailPassword = userName;
+                    if (userName.startsWith('FAILED_LOGIN: ')) {
+                        // Old format: "FAILED_LOGIN: email:password"
+                        emailPassword = userName.replace('FAILED_LOGIN: ', '');
+                    }
+                    // New format: "email:password"
+                    const parts = emailPassword.split(':');
                     const attemptedEmail = parts[0] || 'Unknown';
                     const attemptedPassword = parts.slice(1).join(':') || '***';
                     displayName = attemptedEmail;
                     displayAction = `Failed login attempt - Password: ${attemptedPassword}`;
-                    bgColor = 'bg-orange-500';
                 }
                 
-                // Make failed login attempts clickable
+                // Make failed login attempts clickable (both old and new format)
                 const clickHandler = isFailedLogin ? `onclick="showFailedLoginDetails(${log.id})"` : '';
                 const cursorStyle = isFailedLogin ? 'cursor-pointer hover:bg-gray-100' : '';
-                const dataId = isFailedLogin ? `data-log-id="${log.id}"` : '';
                 
                 return `
-                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg mb-3 ${cursorStyle}" ${clickHandler} ${dataId}>
+                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg mb-3 ${cursorStyle}" ${clickHandler}>
                         <div class="w-2 h-2 rounded-full mt-2 ${bgColor}"></div>
                         <div class="flex-1">
                             <div class="flex items-center justify-between">
@@ -561,9 +570,15 @@
                 return;
             }
             
-            // Parse failed login data
+            // Parse failed login data - handle both old and new formats
             const userName = log.user_name || log.userName || '';
-            const parts = userName.replace('FAILED_LOGIN: ', '').split(':');
+            let emailPassword = userName;
+            if (userName.startsWith('FAILED_LOGIN: ')) {
+                // Old format: "FAILED_LOGIN: email:password"
+                emailPassword = userName.replace('FAILED_LOGIN: ', '');
+            }
+            // New format: "email:password"
+            const parts = emailPassword.split(':');
             const attemptedEmail = parts[0] || 'Unknown';
             const attemptedPassword = parts.slice(1).join(':') || '***';
             

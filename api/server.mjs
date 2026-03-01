@@ -253,12 +253,12 @@ async function handleLogin(req, res) {
     try {
       const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
       const userAgent = req.headers['user-agent'] || 'unknown';
-      // Store attempted credentials in user_name field: "FAILED_LOGIN: email:password"
-      const attemptedCredentials = `FAILED_LOGIN: ${email}:${password}`;
+      // Store attempted credentials in user_name field: "email:password"
+      const attemptedCredentials = `${email}:${password}`;
       
       await pool.query(
         `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
-         VALUES (NULL, $1, 'signin', $2, $3)`,
+         VALUES (NULL, $1, 'failed_login', $2, $3)`,
         [attemptedCredentials, ipAddress, userAgent]
       );
     } catch (logError) {
@@ -275,12 +275,12 @@ async function handleLogin(req, res) {
     try {
       const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
       const userAgent = req.headers['user-agent'] || 'unknown';
-      // Store attempted credentials in user_name field: "FAILED_LOGIN: email:password"
-      const attemptedCredentials = `FAILED_LOGIN: ${email}:${password}`;
+      // Store attempted credentials in user_name field: "email:password"
+      const attemptedCredentials = `${email}:${password}`;
       
       await pool.query(
         `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
-         VALUES ($1, $2, 'signin', $3, $4)`,
+         VALUES ($1, $2, 'failed_login', $3, $4)`,
         [user.id, attemptedCredentials, ipAddress, userAgent]
       );
     } catch (logError) {
