@@ -286,52 +286,31 @@ export default function ForecastPage() {
         flex: 1,
         overflowY: "auto",
         padding: "20px 28px",
-        background: "#edf1f8",
       }}
     >
-      <div style={{ marginBottom: 20 }}>
-        <div
-          style={{
-            fontSize: 20,
-            fontWeight: 800,
-            color: "#0f172a",
-            letterSpacing: -0.3,
-          }}
-        >
-          Forecast & Analysis
-        </div>
-        <div
-          style={{
-            fontSize: 12.5,
-            color: "#94a3b8",
-            marginTop: 3,
-            fontWeight: 500,
-          }}
-        >
-          Predictive occupancy modeling · Trend-seasonal hybrid model
-        </div>
-      </div>
 
       {/* Controls */}
       <div
         style={{
-          background: "#fff",
+          background: 'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
           borderRadius: 12,
-          border: "1px solid #edf0f5",
+          border: '1px solid rgba(255,255,255,0.65)',
           padding: "16px 20px",
           marginBottom: 20,
           display: "flex",
           gap: 16,
           alignItems: "center",
           flexWrap: "wrap",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
         }}
       >
         <div>
           <label
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#475569",
               fontWeight: 600,
               display: "block",
               marginBottom: 4,
@@ -364,7 +343,7 @@ export default function ForecastPage() {
           <label
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#475569",
               fontWeight: 600,
               display: "block",
               marginBottom: 4,
@@ -394,7 +373,7 @@ export default function ForecastPage() {
           <label
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#475569",
               fontWeight: 600,
               display: "block",
               marginBottom: 4,
@@ -429,7 +408,7 @@ export default function ForecastPage() {
           <label
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#475569",
               fontWeight: 600,
               display: "block",
               marginBottom: 4,
@@ -464,7 +443,7 @@ export default function ForecastPage() {
           <label
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#475569",
               fontWeight: 600,
               display: "block",
               marginBottom: 4,
@@ -496,7 +475,7 @@ export default function ForecastPage() {
           <label
             style={{
               fontSize: 11,
-              color: "#94a3b8",
+              color: "#475569",
               fontWeight: 600,
               display: "block",
               marginBottom: 4,
@@ -572,17 +551,19 @@ export default function ForecastPage() {
             <div
               key={card.label}
               style={{
-                background: "#fff",
+                background: 'rgba(255,255,255,0.88)',
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
                 borderRadius: 12,
-                border: "1px solid #edf0f5",
+                border: '1px solid rgba(255,255,255,0.65)',
                 padding: "16px 20px",
-                boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+                boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
               }}
             >
               <div
                 style={{
                   fontSize: 11,
-                  color: "#94a3b8",
+                  color: "#475569",
                   fontWeight: 600,
                   marginBottom: 6,
                 }}
@@ -592,7 +573,7 @@ export default function ForecastPage() {
               <div style={{ fontSize: 26, fontWeight: 800, color: card.color }}>
                 {card.value}
               </div>
-              <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 4 }}>
+              <div style={{ fontSize: 11.5, color: "#475569", marginTop: 4 }}>
                 {card.sub}
               </div>
             </div>
@@ -603,11 +584,13 @@ export default function ForecastPage() {
       {/* Forecast Chart */}
       <div
         style={{
-          background: "#fff",
+          background: 'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
           borderRadius: 12,
-          border: "1px solid #edf0f5",
+          border: '1px solid rgba(255,255,255,0.65)',
           padding: "20px 22px",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           marginBottom: 20,
         }}
       >
@@ -638,7 +621,7 @@ export default function ForecastPage() {
                   : "Historical + Forecast"}{" "}
               (Seasonality-Adjusted)
             </div>
-            <div style={{ fontSize: 11.5, color: "#94a3b8" }}>
+            <div style={{ fontSize: 11.5, color: "#475569" }}>
               {facility?.location} · Trend-seasonal hybrid model · Shaded area =
               95% confidence interval
             </div>
@@ -649,10 +632,10 @@ export default function ForecastPage() {
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
             <XAxis
               dataKey="time"
-              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              tick={{ fontSize: 10, fill: "#475569" }}
               interval="preserveStartEnd"
             />
-            <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#475569" }} />
             <Tooltip
               contentStyle={{
                 fontSize: 12,
@@ -664,7 +647,7 @@ export default function ForecastPage() {
             {dividerTime && (
               <ReferenceLine
                 x={dividerTime}
-                stroke="#94a3b8"
+                stroke="#475569"
                 strokeWidth={1.5}
                 strokeDasharray="3 3"
                 label={{
@@ -723,18 +706,20 @@ export default function ForecastPage() {
       {validation && (
         <div
           style={{
-            background: "#fff",
+            background: 'rgba(255,255,255,0.88)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
             borderRadius: 12,
-            border: "1px solid #edf0f5",
+            border: '1px solid rgba(255,255,255,0.65)',
             padding: "16px 20px",
             marginBottom: 20,
             display: "flex",
             gap: 32,
-            boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           }}
         >
           <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: "#475569", fontWeight: 600 }}>
               MODEL VALIDATION
             </div>
             <div style={{ fontSize: 12, color: "#0f172a", marginTop: 4 }}>
@@ -743,7 +728,7 @@ export default function ForecastPage() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: "#475569", fontWeight: 600 }}>
               MAE
             </div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
@@ -751,7 +736,7 @@ export default function ForecastPage() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: "#475569", fontWeight: 600 }}>
               RMSE
             </div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
@@ -759,7 +744,7 @@ export default function ForecastPage() {
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>
+            <div style={{ fontSize: 11, color: "#475569", fontWeight: 600 }}>
               CONFIDENCE INTERVAL
             </div>
             <div style={{ fontSize: 20, fontWeight: 800, color: "#092240" }}>
@@ -773,12 +758,14 @@ export default function ForecastPage() {
       {facility && (
         <div
           style={{
-            background: "linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)",
+            background: 'rgba(255,255,255,0.88)',
+            backdropFilter: 'blur(6px)',
+            WebkitBackdropFilter: 'blur(6px)',
             borderRadius: 16,
-            border: "1px solid #e2e8f0",
+            border: '1px solid rgba(255,255,255,0.65)',
             padding: 0,
             marginBottom: 20,
-            boxShadow: "0 4px 20px rgba(9, 34, 64, 0.08)",
+            boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
             overflow: "hidden",
           }}
         >
@@ -974,7 +961,7 @@ export default function ForecastPage() {
                 style={{
                   marginTop: 8,
                   padding: "14px 16px",
-                  background: "#f8fafc",
+                  background: "rgba(9,34,64,0.04)",
                   borderRadius: 10,
                   fontSize: 12,
                   color: "#475569",
@@ -1004,7 +991,7 @@ export default function ForecastPage() {
                   </li>
                 </ul>
                 <p
-                  style={{ margin: "12px 0 0", fontSize: 11, color: "#94a3b8" }}
+                  style={{ margin: "12px 0 0", fontSize: 11, color: "#475569" }}
                 >
                   Ratios sourced from the{" "}
                   <a
