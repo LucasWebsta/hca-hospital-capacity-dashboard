@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, LogOut, User } from 'lucide-react';
+import { api } from '../api';
+import type { FacilityListItem } from '../api';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -36,6 +38,7 @@ interface HeaderProps {
   trendDays: number;
   onTrendDaysChange: (days: number) => void;
   onAlertsClick: () => void;
+  onFacilityChange: (facilityId: number | null, name: string) => void;
 }
 
 function Dropdown({ label, options, onSelect }: {
@@ -81,19 +84,25 @@ function Dropdown({ label, options, onSelect }: {
   );
 }
 
-export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderProps) {
-  const [facilityNames, setFacilityNames] = useState<string[]>(['All Facilities']);
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange }: HeaderProps) {
+  const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
+  const [selectedFacilityName, setSelectedFacilityName] = useState('All Facilities');
   const sessionUser = getSessionUser();
   const initials = getInitials(sessionUser);
 
   useEffect(() => {
-    fetch('/api/facilities')
-      .then(r => r.json())
-      .then((data: { name: string }[]) => {
-        setFacilityNames(['All Facilities', ...data.map(f => f.name)]);
-      })
-      .catch(() => {});
+    api.getFacilitiesList().then(setFacilities).catch(() => {});
   }, []);
+
+  function handleFacilitySelect(name: string) {
+    setSelectedFacilityName(name);
+    if (name === 'All Facilities') {
+      onFacilityChange(null, 'All Facilities');
+    } else {
+      const match = facilities.find(f => f.name === name);
+      if (match) onFacilityChange(match.id, match.name);
+    }
+  }
 
   return (
     <div style={{
@@ -108,9 +117,9 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderPr
       {/* Left filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Dropdown
-          label="All Facilities"
-          options={facilityNames}
-          onSelect={() => {}}
+          label={selectedFacilityName}
+          options={['All Facilities', ...facilities.map(f => f.name)]}
+          onSelect={handleFacilitySelect}
         />
       </div>
 

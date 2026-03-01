@@ -28,16 +28,17 @@ function OccupancyBar({ value, color }: { value: number; color: string }) {
   );
 }
 
-export function FacilitiesAtRisk() {
+export function FacilitiesAtRisk({ facilityId }: { facilityId?: number }) {
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.getFacilities()
+    setLoading(true);
+    api.getFacilities(facilityId)
       .then(setFacilities)
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [facilityId]);
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>

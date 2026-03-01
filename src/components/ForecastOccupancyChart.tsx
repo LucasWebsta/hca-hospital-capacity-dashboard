@@ -9,24 +9,24 @@ const BRAND_ORANGE = '#E75925';
 
 type Days = '7' | '14' | '30' | '60';
 
-export function ForecastOccupancyChart() {
+export function ForecastOccupancyChart({ facilityId }: { facilityId?: number }) {
   const [days, setDays] = useState<Days>('7');
   const [chartData, setChartData] = useState<{ d: string; val: number; lo: number; hi: number }[]>([]);
   const [stats, setStats] = useState({ mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 });
 
   useEffect(() => {
-    api.getForecast(parseInt(days, 10))
+    api.getForecast(parseInt(days, 10), facilityId)
       .then((res: ForecastResponse) => {
-        setChartData(res.data.map((item: Record<string, unknown>) => ({
+        setChartData(res.data.map((item) => ({
           d:   item.date      as string,
-          val: item.predicted as number,
-          lo:  (item.lower  ?? (item.predicted as number) - 30) as number,
-          hi:  (item.upper  ?? (item.predicted as number) + 30) as number,
+          val: (item as unknown as { predicted: number }).predicted,
+          lo:  ((item as unknown as { lower?: number }).lower  ?? (item as unknown as { predicted: number }).predicted - 30),
+          hi:  ((item as unknown as { upper?: number }).upper  ?? (item as unknown as { predicted: number }).predicted + 30),
         })));
         setStats(res.stats);
       })
       .catch(console.error);
-  }, [days]);
+  }, [days, facilityId]);
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
