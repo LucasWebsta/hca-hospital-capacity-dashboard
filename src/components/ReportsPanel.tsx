@@ -408,7 +408,7 @@ function LiveOverview({ facilityId, facilityName }: { facilityId: number | null;
   return <OverviewBlock census={census} facilityName={facilityName} />;
 }
 
-function OverviewBlock({ census, facilityName }: { census: CensusMetrics; facilityName: string }) {
+function OverviewBlock({ census }: { census: CensusMetrics; facilityName: string }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
       <MetricCard title="Current Census" value={census.totalCensus} unit={String(census.totalCapacity)} subtext="Occupied Beds" accentColor={BRAND_BLUE} />

@@ -40,7 +40,6 @@ export function forecastMetric(
     const lastTime = filtered[filtered.length - 1].timestamp.getTime();
     const stepsAhead = (hoursAhead * 60) / 15;
     const oneDayMs = 24 * 60 * 60 * 1000;
-    const sevenDaysMs = 7 * oneDayMs;
 
     // Only use last 7 days for seasonal pattern
 const oneDayAgo = lastTime - oneDayMs;
