@@ -184,6 +184,44 @@ async function handleTrend(res, days = 30) {
   json(res, rows);
 }
 
+// ── /api/auth/login ─────────────────────────────────────────────────────────
+async function handleLogin(req, res) {
+  let body = '';
+  for await (const chunk of req) body += chunk;
+  const { email, password } = JSON.parse(body || '{}');
+
+  if (!email || !password) {
+    return json(res, { error: 'Email and password are required' }, 400);
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name, email, role, photo_url
+     FROM users
+     WHERE LOWER(email) = LOWER($1) AND is_active = true`,
+    [email]
+  );
+
+  if (rows.length === 0) {
+    return json(res, { error: 'Invalid email or password' }, 401);
+  }
+
+  const user = rows[0];
+  // Demo: accept any non-empty password (hashes in DB are placeholder values)
+  const canAccessAdmin = ['Regional Manager', 'Facility Administrator'].includes(user.role);
+
+  return json(res, {
+    user: {
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      role: user.role,
+      photoUrl: user.photo_url,
+    },
+    canAccessAdmin,
+  });
+}
+
 // ── /api/forecast ─────────────────────────────────────────────────────────────
 async function handleForecast(res, days = 7) {
   const { rows } = await pool.query(`
@@ -205,7 +243,7 @@ async function handleForecast(res, days = 7) {
 // ── Router ────────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Content-Type' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type' });
     res.end();
     return;
   }
@@ -214,9 +252,10 @@ const server = http.createServer(async (req, res) => {
   const path = url.pathname.replace(/^\/api/, '');
   const days = parseInt(url.searchParams.get('days') ?? '30', 10);
 
-  console.log(`[${new Date().toLocaleTimeString()}] GET ${url.pathname}`);
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname}`);
 
   try {
+    if (path === '/auth/login' && req.method === 'POST') return await handleLogin(req, res);
     if (path === '/census')     return await handleCensus(res);
     if (path === '/facilities') return await handleFacilities(res);
     if (path === '/alerts')     return await handleAlerts(res);
@@ -231,5 +270,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n✅  API server running at http://localhost:${PORT}/api`);
-  console.log('   /census  /facilities  /alerts  /trend?days=N  /forecast?days=N\n');
+  console.log('   /census  /facilities  /alerts  /trend?days=N  /forecast?days=N  POST /auth/login\n');
 });
