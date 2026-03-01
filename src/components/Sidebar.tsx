@@ -93,7 +93,7 @@ export function Sidebar({ activeTab, onTabChange, facilityName }: SidebarProps) 
                 boxShadow: `0 1px 6px rgba(231,89,37,0.45)`,
               }}>
                 {photoUrl
-                  ? <img src={photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ? <img src={photoUrl} alt={fullName} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : initials
                 }
               </div>
