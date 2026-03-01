@@ -428,6 +428,78 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, historicalRows);
     }
 
+    // GET /api/rawMetrics?facilityId=1234 — raw metrics for ForecastPage
+    if (base === 'rawMetrics' && method === 'GET') {
+      const facilityId = query.get('facilityId');
+      if (!facilityId) {
+        return send(res, 400, { error: 'facilityId is required' });
+      }
+      try {
+        // Try facility_metrics_wide first, then fallback to facility_metrics
+        let rows = [];
+        try {
+          // Query facility_metrics_wide and expand into multiple rows (one per metric type)
+          const { rows: wideRows } = await db.query(`
+            SELECT 
+              facility_id,
+              'Total Census' AS metric,
+              update_utc AS source_update_date,
+              total_census AS metric_value
+            FROM facility_metrics_wide
+            WHERE facility_id = $1
+              AND total_census IS NOT NULL
+              AND update_utc >= NOW() - INTERVAL '60 days'
+            UNION ALL
+            SELECT 
+              facility_id,
+              'ICU Occupancy' AS metric,
+              update_utc AS source_update_date,
+              icu_occupancy AS metric_value
+            FROM facility_metrics_wide
+            WHERE facility_id = $1
+              AND icu_occupancy IS NOT NULL
+              AND update_utc >= NOW() - INTERVAL '60 days'
+            UNION ALL
+            SELECT 
+              facility_id,
+              'Admissions' AS metric,
+              update_utc AS source_update_date,
+              admissions AS metric_value
+            FROM facility_metrics_wide
+            WHERE facility_id = $1
+              AND admissions IS NOT NULL
+              AND update_utc >= NOW() - INTERVAL '60 days'
+            UNION ALL
+            SELECT 
+              facility_id,
+              'Discharges' AS metric,
+              update_utc AS source_update_date,
+              discharges AS metric_value
+            FROM facility_metrics_wide
+            WHERE facility_id = $1
+              AND discharges IS NOT NULL
+              AND update_utc >= NOW() - INTERVAL '60 days'
+            ORDER BY source_update_date ASC
+          `, [facilityId]);
+          rows = wideRows;
+        } catch (wideErr) {
+          // Fallback to facility_metrics if facility_metrics_wide doesn't exist or fails
+          const { rows: fallbackRows } = await db.query(`
+            SELECT facility_id, metric, source_update_date, metric_value
+            FROM facility_metrics
+            WHERE facility_id = $1
+              AND source_update_date >= NOW() - INTERVAL '60 days'
+            ORDER BY source_update_date ASC
+          `, [facilityId]);
+          rows = fallbackRows;
+        }
+        return send(res, 200, rows || []);
+      } catch (err) {
+        console.error('rawMetrics error:', err);
+        return send(res, 500, { error: 'Internal server error', details: err.message });
+      }
+    }
+
     // GET /api/forecast (optional ?facility_id= for single facility)
     if (base === 'forecast' && method === 'GET') {
       const days = parseInt(query.get('days') || '7', 10);
