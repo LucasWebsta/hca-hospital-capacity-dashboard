@@ -189,7 +189,40 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  function handleLogout() {
+  async function handleLogout() {
+    const userStr = sessionStorage.getItem('user');
+    let userId: number | null = null;
+    let userName = 'Unknown';
+    
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        userId = user.id || null;
+        userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown';
+      } catch (e) {
+        console.error('Error parsing user from session:', e);
+      }
+    }
+    
+    try {
+      // Call logout API to log the sign-out event
+      const API_BASE = window.location.protocol === 'file:' 
+        ? 'http://localhost:7071/api'
+        : '/api';
+      
+      await fetch(`${API_BASE}/auth/logout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, userName })
+      });
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with logout even if API call fails
+    }
+    
+    // Clear session storage and redirect to login
     sessionStorage.clear();
     window.location.href = '/login.html';
   }
