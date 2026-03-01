@@ -10,12 +10,14 @@ export async function forecastHandler(
     const days = parseInt(request.query.get('days') ?? '7', 10);
     const db = getDb();
 
-    // Get the last 14 days of actuals to build a trend-based forecast
+    // facility_metrics (metric='total') by date for trend-based forecast
     const { rows: recent } = await db.query(`
-      SELECT census_date, SUM(current_census)::int AS total
-      FROM   hospital_census
-      WHERE  census_date >= (SELECT MAX(census_date) FROM hospital_census) - INTERVAL '14 days'
-      GROUP  BY census_date
+      SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
+      FROM   facility_metrics
+      WHERE  LOWER(metric) IN ('total census', 'total')
+        AND  (source_update_date AT TIME ZONE 'UTC')::date >=
+             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - INTERVAL '14 days'
+      GROUP  BY (source_update_date AT TIME ZONE 'UTC')::date
       ORDER  BY census_date ASC
     `);
 
