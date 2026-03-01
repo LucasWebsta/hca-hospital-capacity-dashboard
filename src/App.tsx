@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Sidebar,
   Header,
@@ -12,8 +13,22 @@ import { api } from './api';
 import type { CensusMetrics } from './api';
 import './App.css';
 
+function pathnameToTab(pathname: string): string {
+  if (pathname === '/' || pathname === '') return 'dashboard';
+  const segment = pathname.replace(/^\//, '').split('/')[0];
+  return segment || 'dashboard';
+}
+
 function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = pathnameToTab(location.pathname);
+
+  const setActiveTab = (tab: string) => {
+    if (tab === 'dashboard') navigate('/');
+    else navigate('/' + tab);
+  };
+
   const [trendDays, setTrendDays] = useState(30);
   const [census, setCensus] = useState<CensusMetrics>({
     totalCensus: 948, totalCapacity: 1112, occupancyRate: 85.2, sevenDayForecast: 963,
@@ -31,7 +46,7 @@ function App() {
         <Header
           trendDays={trendDays}
           onTrendDaysChange={setTrendDays}
-          onAlertsClick={() => setActiveTab('alerts')}
+          onAlertsClick={() => navigate('/alerts')}
         />
 
         {activeTab === 'dashboard' && (
