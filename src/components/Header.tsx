@@ -16,7 +16,7 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-function getSessionUser(): { firstName: string; lastName: string; role: string } | null {
+function getSessionUser(): { firstName: string; lastName: string; role: string; photoUrl?: string } | null {
   try {
     const raw = sessionStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
@@ -40,8 +40,6 @@ interface HeaderProps {
   onTrendDaysChange: (days: number) => void;
   onAlertsClick: () => void;
   onFacilityChange: (facilityId: number | null, name: string) => void;
-  /** Current facility selection from parent (keeps dropdown in sync with dashboard/reports). */
-  selectedFacilityId?: number | null;
   selectedFacilityName?: string;
 }
 
@@ -92,14 +90,21 @@ function Dropdown({ label, options, onSelect }: {
   );
 }
 
-export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityId = null, selectedFacilityName }: HeaderProps) {
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityName }: HeaderProps) {
   const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
   const sessionUser = getSessionUser();
   const initials = getInitials(sessionUser);
   const facilityLabel = selectedFacilityName ?? 'All Facilities';
 
   useEffect(() => {
-    api.getFacilitiesList().then(setFacilities).catch(() => {});
+    api.getFacilitiesList().then(list => {
+      setFacilities(list);
+      const homeId = localStorage.getItem('homeLocation');
+      if (homeId && homeId !== 'all') {
+        const match = list.find(f => String(f.id) === homeId);
+        if (match) onFacilityChange(match.id, match.name);
+      }
+    }).catch(() => {});
   }, []);
 
   function handleFacilitySelect(name: string) {
@@ -161,15 +166,16 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
         </button>
 
         {/* Avatar + profile dropdown */}
-        <AvatarMenu initials={initials} sessionUser={sessionUser} />
+        <AvatarMenu initials={initials} sessionUser={sessionUser} onFacilityChange={onFacilityChange} />
       </div>
     </div>
   );
 }
 
-function AvatarMenu({ initials, sessionUser }: {
+function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
   initials: string;
-  sessionUser: { firstName: string; lastName: string; role: string } | null;
+  sessionUser: { firstName: string; lastName: string; role: string; photoUrl?: string } | null;
+  onFacilityChange: (id: number | null, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -190,6 +196,7 @@ function AvatarMenu({ initials, sessionUser }: {
 
   const fullName = sessionUser ? `${sessionUser.firstName} ${sessionUser.lastName}` : 'User';
   const role = sessionUser?.role ?? '';
+  const photoUrl = sessionUser?.photoUrl;
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -198,12 +205,17 @@ function AvatarMenu({ initials, sessionUser }: {
         title={fullName}
         style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: BRAND_BLUE,
+          background: BRAND_BLUE, overflow: 'hidden',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
-          boxShadow: `0 1px 6px rgba(9,34,64,0.3)`,
+          boxShadow: `0 1px 6px rgba(9,34,64,0.3)`, flexShrink: 0,
         }}
-      >{initials}</div>
+      >
+        {photoUrl
+          ? <img src={photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : initials
+        }
+      </div>
 
       {open && (
         <div style={{
@@ -247,7 +259,7 @@ function AvatarMenu({ initials, sessionUser }: {
         </div>
       )}
 
-      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} onFacilityChange={onFacilityChange} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ const BRAND_ORANGE = '#E75925';
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onFacilityChange?: (id: number | null, name: string) => void;
 }
 
 interface FacilityOption {
@@ -15,7 +16,7 @@ interface FacilityOption {
   name: string;
 }
 
-export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
+export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModalProps) {
   const sessionUser = (() => {
     try {
       const raw = sessionStorage.getItem('user');
@@ -33,7 +34,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     () => localStorage.getItem('homeLocation') ?? 'all'
   );
   const [profilePicture, setProfilePicture] = useState<string | null>(
-    () => localStorage.getItem('profilePicture')
+    () => localStorage.getItem('profilePicture') ?? sessionUser?.photoUrl ?? null
   );
   const [notifications, setNotifications] = useState({
     email: localStorage.getItem('notifEmail') !== 'false',
@@ -73,6 +74,16 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     localStorage.setItem('notifPush',  String(notifications.push));
     localStorage.setItem('notifSms',   String(notifications.sms));
     setIsEditing(false);
+    // update the active dashboard filter to reflect the new home hospital
+    if (onFacilityChange) {
+      if (homeLocation === 'all') {
+        onFacilityChange(null, 'All Facilities');
+      } else {
+        const match = facilities.find(f => String(f.id) === homeLocation);
+        if (match) onFacilityChange(match.id, match.name);
+      }
+    }
+    onClose();
   }
 
   function handleCancel() {

@@ -62,7 +62,7 @@ function App() {
         overflow: "hidden",
       }}
     >
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} facilityName={selectedFacilityName} />
 
       <div
         style={{
