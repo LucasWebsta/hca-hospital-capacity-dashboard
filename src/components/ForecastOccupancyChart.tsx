@@ -1,474 +1,315 @@
-import { useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { api } from '../api';
-import type { ForecastResponse, PredictionDrivers } from '../api';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, ReferenceLine, ComposedChart, Line
+} from 'recharts';
+import { forecastMetric, validateModel } from '../utils/forecast';
+import { loadFacilities, loadMetrics } from '../utils/loadData';
+import type { Facility, MetricRow } from '../utils/loadData';
 import { InfoTooltip } from './InfoTooltip';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
 
-type TimeWindow = 'past-week' | 'current-week' | 'next-week' | 'next-month';
+const METRICS = ['Total Census', 'Admissions', 'Discharges', 'ICU Occupancy'] as const;
+type MetricType = typeof METRICS[number];
+type HorizonType = '24' | '168' | '720';
+type GranularityType = 'hourly' | 'daily';
 
-export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { facilityId?: number; tooltipsOn?: boolean }) {
-  const [timeWindow, setTimeWindow] = useState<TimeWindow>('next-week');
-  const [chartData, setChartData] = useState<{ d: string; val: number; lo80: number; hi80: number; lo95: number; hi95: number; isHistorical?: boolean }[]>([]);
-  const [stats, setStats] = useState({ mae: 0, rmse: 0, mape: 0, accuracy: 0, trainSize: 0, testSize: 0, validationMethod: '' });
-  const [drivers, setDrivers] = useState<PredictionDrivers | null>(null);
+export function ForecastOccupancyChart({
+  facilityId,
+  tooltipsOn = true,
+}: {
+  facilityId?: number;
+  tooltipsOn?: boolean;
+}) {
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [metrics, setMetrics] = useState<MetricRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>('Total Census');
+  const [horizon, setHorizon] = useState<HorizonType>('168');
+  const [granularity, setGranularity] = useState<GranularityType>('daily');
 
   useEffect(() => {
+    loadFacilities().then(setFacilities).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (facilities.length === 0) return;
     setLoading(true);
-    const forecastDays = timeWindow === 'past-week' ? 0 : 
-                        timeWindow === 'current-week' ? 7 :
-                        timeWindow === 'next-week' ? 7 :
-                        timeWindow === 'next-month' ? 30 : 7;
-    
-    if (timeWindow === 'past-week') {
-      // Show only historical data
-      api.getTrend(7, facilityId, 'overall')
-        .then((data) => {
-          const historicalPoints = data.map((item) => ({
-            d: item.date,
-            val: item.actual ?? item.forecast ?? 0,
-            lo80: item.actual ?? item.forecast ?? 0,
-            hi80: item.actual ?? item.forecast ?? 0,
-            lo95: item.actual ?? item.forecast ?? 0,
-            hi95: item.actual ?? item.forecast ?? 0,
-            isHistorical: true
-          }));
-          setChartData(historicalPoints);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error('Historical data error:', err);
-          setLoading(false);
-        });
-      return;
-    }
+    const fId = facilityId ?? facilities[0].facilityId;
+    loadMetrics(fId)
+      .then(m => { setMetrics(m); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [facilityId, facilities]);
 
-    // For current-week, load both historical and forecast
-    if (timeWindow === 'current-week') {
-      Promise.all([
-        api.getTrend(7, facilityId, 'overall'),
-        api.getForecast(7, facilityId)
-      ])
-        .then(([historical, forecast]) => {
-          const historicalPoints = historical.slice(-7).map((item) => ({
-            d: item.date,
-            val: item.actual ?? item.forecast ?? 0,
-            lo80: item.actual ?? item.forecast ?? 0,
-            hi80: item.actual ?? item.forecast ?? 0,
-            lo95: item.actual ?? item.forecast ?? 0,
-            hi95: item.actual ?? item.forecast ?? 0,
-            isHistorical: true
-          }));
-          const forecastPoints = forecast.data.map((item) => ({
-            d: item.date as string,
-            val: item.predicted ?? item.forecast ?? 0,
-            lo80: item.lower80 ?? item.lower ?? 0,
-            hi80: item.upper80 ?? item.upper ?? 0,
-            lo95: item.lower95 ?? item.lower ?? 0,
-            hi95: item.upper95 ?? item.upper ?? 0,
-            isHistorical: false
-          }));
-          setChartData([...historicalPoints, ...forecastPoints]);
-          setStats(forecast.stats);
-          setDrivers(forecast.drivers ?? null);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error('Data loading error:', err);
-          setLoading(false);
-        });
-      return;
-    }
+  const activeFacilityId: number | null = facilityId ?? facilities[0]?.facilityId ?? null;
 
-    // For future windows, load forecast only
-    api.getForecast(forecastDays, facilityId)
-      .then((res: ForecastResponse) => {
-        const forecastPoints = res.data.map((item) => ({
-          d: item.date as string,
-          val: item.predicted ?? item.forecast ?? 0,
-          lo80: item.lower80 ?? item.lower ?? 0,
-          hi80: item.upper80 ?? item.upper ?? 0,
-          lo95: item.lower95 ?? item.lower ?? 0,
-          hi95: item.upper95 ?? item.upper ?? 0,
-          isHistorical: false
-        }));
-        setChartData(forecastPoints);
-        setStats(res.stats);
-        setDrivers(res.drivers ?? null);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Forecast error:', err);
-        setLoading(false);
+  const chartData = useMemo(() => {
+    if (activeFacilityId === null || metrics.length === 0) return [];
+    const now = new Date();
+    const horizonH = parseInt(horizon);
+    const forecastEnd = new Date(now.getTime() + horizonH * 3600 * 1000);
+    const historicalStart = new Date(now.getTime() - 7 * 24 * 3600 * 1000);
+
+    const allData = forecastMetric(metrics, activeFacilityId, selectedMetric, horizonH);
+
+    const filtered = allData.filter(p => {
+      if (!p.isForecast) return p.timestamp >= historicalStart;
+      return p.timestamp <= forecastEnd;
+    });
+
+    if (granularity === 'daily') {
+      type Bucket = { values: number[]; uppers: number[]; lowers: number[]; isForecast: boolean };
+      const buckets = new Map<string, Bucket>();
+      filtered.forEach(p => {
+        const d = new Date(p.timestamp);
+        d.setHours(0, 0, 0, 0);
+        const key = d.toISOString();
+        if (!buckets.has(key)) buckets.set(key, { values: [], uppers: [], lowers: [], isForecast: p.isForecast });
+        const b = buckets.get(key)!;
+        b.values.push(p.value);
+        b.uppers.push(p.upper);
+        b.lowers.push(p.lower);
       });
-  }, [timeWindow, facilityId]);
+      return Array.from(buckets.entries())
+        .sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
+        .map(([key, b]) => ({
+          d: new Date(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          val: Math.round(b.values.reduce((a, x) => a + x, 0) / b.values.length),
+          upper: Math.round(b.uppers.reduce((a, x) => a + x, 0) / b.uppers.length),
+          lower: Math.round(b.lowers.reduce((a, x) => a + x, 0) / b.lowers.length),
+          isForecast: b.isForecast,
+        }));
+    }
 
-  // Calculate dynamic Y-axis domain from data
-  const allValues = chartData.flatMap(d => [d.val, d.lo95, d.hi95]).filter(v => v > 0);
+    // Hourly: sample every 4th 15-min point
+    return filtered
+      .filter((_, i) => i % 4 === 0)
+      .map(p => ({
+        d: p.timestamp.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit' }),
+        val: p.value,
+        upper: p.upper,
+        lower: p.lower,
+        isForecast: p.isForecast,
+      }));
+  }, [metrics, activeFacilityId, selectedMetric, horizon, granularity]);
+
+  const validation = useMemo(() => {
+    if (activeFacilityId === null || metrics.length === 0) return null;
+    return validateModel(metrics, activeFacilityId, selectedMetric);
+  }, [metrics, activeFacilityId, selectedMetric]);
+
+  const accuracy = useMemo(() => {
+    if (!validation || activeFacilityId === null) return null;
+    const relevant = metrics.filter(r => r.orgId === activeFacilityId && r.metric === selectedMetric);
+    if (relevant.length === 0) return null;
+    const avg = relevant.reduce((a, r) => a + r.value, 0) / relevant.length;
+    return avg === 0 ? null : Math.max(0, 100 - (validation.mae / avg) * 100);
+  }, [validation, metrics, activeFacilityId, selectedMetric]);
+
+  const allValues = chartData.flatMap(d => [d.val, d.upper, d.lower]).filter(v => v > 0);
   const minVal = allValues.length > 0 ? Math.max(0, Math.floor(Math.min(...allValues) * 0.95)) : 0;
   const maxVal = allValues.length > 0 ? Math.ceil(Math.max(...allValues) * 1.05) : 1000;
 
-  const confidenceColor = drivers?.confidence === 'high' ? '#16a34a' : drivers?.confidence === 'medium' ? '#eab308' : '#ef4444';
-
-  // Find divider date for current-week view (where historical ends and forecast begins)
-  const dividerDate = timeWindow === 'current-week' && chartData.length > 0
+  const dividerDate = chartData.length > 0
     ? (() => {
-        const firstForecastIdx = chartData.findIndex(d => !d.isHistorical);
-        return firstForecastIdx > 0 ? chartData[firstForecastIdx - 1].d : null;
+        const idx = chartData.findIndex(d => d.isForecast);
+        return idx > 0 ? chartData[idx - 1].d : null;
       })()
     : null;
 
+  const metricUnit =
+    selectedMetric === 'Total Census' || selectedMetric === 'ICU Occupancy' ? 'beds'
+    : selectedMetric === 'Admissions' ? 'admissions'
+    : 'discharges';
+
   return (
-    <div style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.88)', padding: '20px 20px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+    <div style={{
+      background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)',
+      WebkitBackdropFilter: 'blur(6px)', borderRadius: 12,
+      border: '1px solid rgba(255,255,255,0.88)', padding: '20px 20px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+    }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
-        {/* Title row */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Forecast Occupancy</span>
-            {tooltipsOn && (
-              <InfoTooltip text="Linear regression model with 80% and 95% confidence intervals. Validated using 80/20 train/test split and 5-fold cross-validation. MAE, RMSE, and MAPE show prediction accuracy. Cross-validation metrics provide additional robustness assessment." />
-            )}
-          </div>
-          <div style={{ fontSize: 11, color: '#475569', marginTop: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-            <span>Linear Regression · CI 80% & 95% · {(stats.validationMethod || 'train_test_split_80_20').replace('train_test_split_', '').replace('_', '/')} split</span>
-            {(stats as any).crossValidation && <span>· {(stats as any).crossValidation.kFolds}-fold CV</span>}
-            {tooltipsOn && (
-              <InfoTooltip 
-                text="Model Details: This forecast uses a linear regression model that finds trends in historical data. The model was validated by training on 80% of data and testing on 20%, plus 5-fold cross-validation for extra reliability. Confidence intervals show the range of likely outcomes." 
-                minWidth={320} 
-                maxWidth={420} 
-              />
-            )}
-          </div>
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Forecast Occupancy</span>
+          {tooltipsOn && (
+            <InfoTooltip text="Trend-seasonal hybrid model using linear regression + intraday seasonality. Validated with 80/20 train/test split. Confidence interval shows range of likely outcomes." />
+          )}
         </div>
-        {/* Tab row — full width so tabs never overflow */}
-        <div style={{ display: 'flex', gap: 3, background: 'rgba(0,0,0,0.06)', borderRadius: 7, padding: 3, border: '1px solid rgba(0,0,0,0.10)' }}>
-          {([
-            { id: 'past-week', label: 'Past Wk' },
-            { id: 'current-week', label: 'This Wk' },
-            { id: 'next-week', label: 'Next Wk' },
-            { id: 'next-month', label: 'Next Mo' }
-          ] as { id: TimeWindow; label: string }[]).map(w => (
-            <button key={w.id} onClick={() => setTimeWindow(w.id)} style={{
-              flex: 1, fontSize: 11, fontWeight: 600, padding: '4px 6px', borderRadius: 5,
-              border: 'none', cursor: 'pointer',
-              background: timeWindow === w.id ? BRAND_BLUE : 'transparent',
-              color: timeWindow === w.id ? '#fff' : '#475569',
-              boxShadow: timeWindow === w.id ? `0 1px 4px rgba(9,34,64,0.25)` : 'none',
-              whiteSpace: 'nowrap'
-            }}>{w.label}</button>
+        <div style={{ fontSize: 11, color: '#475569' }}>
+          Trend-Seasonal · CI 95% · 80/20 split
+        </div>
+      </div>
+
+      {/* Metric pills */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 4, marginBottom: 10 }}>
+        {METRICS.map(m => (
+          <button
+            key={m}
+            onClick={() => setSelectedMetric(m)}
+            style={{
+              fontSize: 10.5, fontWeight: 600, padding: '4px 6px', borderRadius: 8,
+              border: selectedMetric === m ? 'none' : '1px solid #e2e8f0',
+              background: selectedMetric === m ? BRAND_BLUE : 'rgba(0,0,0,0.04)',
+              color: selectedMetric === m ? '#fff' : '#475569',
+              cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center',
+            }}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
+      {/* Horizon + Granularity toggles */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14, alignItems: 'center' }}>
+        <div style={{
+          display: 'flex', gap: 2, background: 'rgba(0,0,0,0.06)', borderRadius: 7,
+          padding: 3, border: '1px solid rgba(0,0,0,0.10)', flex: 1,
+        }}>
+          {([['24', '24h'], ['168', '7d'], ['720', '30d']] as [HorizonType, string][]).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setHorizon(val)}
+              style={{
+                flex: 1, fontSize: 10.5, fontWeight: 600, padding: '4px 4px', borderRadius: 5,
+                border: 'none', cursor: 'pointer',
+                background: horizon === val ? BRAND_BLUE : 'transparent',
+                color: horizon === val ? '#fff' : '#475569',
+                boxShadow: horizon === val ? '0 1px 4px rgba(9,34,64,0.25)' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div style={{
+          display: 'flex', gap: 2, background: 'rgba(0,0,0,0.06)', borderRadius: 7,
+          padding: 3, border: '1px solid rgba(0,0,0,0.10)',
+        }}>
+          {([['daily', 'Day'], ['hourly', 'Hr']] as [GranularityType, string][]).map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setGranularity(val)}
+              style={{
+                fontSize: 10.5, fontWeight: 600, padding: '4px 9px', borderRadius: 5,
+                border: 'none', cursor: 'pointer',
+                background: granularity === val ? BRAND_ORANGE : 'transparent',
+                color: granularity === val ? '#fff' : '#475569',
+                boxShadow: granularity === val ? '0 1px 4px rgba(231,89,37,0.3)' : 'none',
+              }}
+            >
+              {label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Performance Metrics */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
-        {[
-          [
-            'MAE', 
-            (stats.mae ?? 0).toFixed(1), 
-            'Mean Absolute Error: The average difference between predicted and actual values. Lower is better. For example, an MAE of 5.8 means predictions are off by about 6 beds on average.'
-          ],
-          [
-            'RMSE', 
-            (stats.rmse ?? 0).toFixed(1), 
-            'Root Mean Squared Error: Similar to MAE but gives more weight to larger errors. A higher RMSE means there were some predictions that were significantly off. Lower is better.'
-          ],
-          [
-            'MAPE', 
-            ((stats.mape ?? 0).toFixed(1) + '%'), 
-            'Mean Absolute Percentage Error: Shows the average percentage difference between predictions and actuals. A MAPE of 5% means predictions are typically within 5% of the actual value.'
-          ],
-          [
-            'Accuracy', 
-            ((stats.accuracy ?? 0).toFixed(1) + '%'), 
-            'Model Accuracy: Calculated as 100% minus MAPE. This shows how close predictions are to actual values. Higher is better - 95% accuracy means predictions are very reliable.'
-          ]
-        ].map(([k, v, desc]) => (
-          <div key={k} style={{ background: '#e8eef8', borderRadius: 7, padding: '5px 10px', border: `1px solid rgba(9,34,64,0.1)`, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, color: '#475569', marginRight: 4 }}>{k}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: BRAND_BLUE }}>{v}</span>
-            {tooltipsOn && <InfoTooltip text={desc} minWidth={320} maxWidth={420} />}
-          </div>
-        ))}
-        {(stats.trainSize ?? 0) > 0 && (
-          <div style={{ background: '#f0f9ff', borderRadius: 7, padding: '5px 10px', border: `1px solid rgba(9,34,64,0.1)`, fontSize: 10, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>Train: {stats.trainSize} | Test: {stats.testSize}</span>
-            {(stats as any).crossValidation && <span>| CV: {(stats as any).crossValidation.kFolds}-fold</span>}
-            {tooltipsOn && (
-              <InfoTooltip 
-                text="Data Split: The model was trained on the 'Train' portion of historical data and tested on the 'Test' portion to measure accuracy. Cross-validation (CV) further validates the model by testing it on different subsets of data." 
-                minWidth={320} 
-                maxWidth={420} 
-              />
-            )}
-          </div>
-        )}
-        {(stats as any).crossValidation && (
-          <div style={{ background: '#fefce8', borderRadius: 7, padding: '5px 10px', border: `1px solid rgba(234,179,8,0.2)`, fontSize: 10, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontWeight: 600, color: '#ca8a04' }}>Cross-Validation:</span> 
-            <span>MAE {(stats as any).crossValidation.cvMae.toFixed(1)} | RMSE {(stats as any).crossValidation.cvRmse.toFixed(1)} | Accuracy {(stats as any).crossValidation.cvAccuracy.toFixed(1)}%</span>
-            {tooltipsOn && (
-              <InfoTooltip 
-                text="Cross-Validation Metrics: These metrics come from testing the model on 5 different subsets of data. This provides a more robust assessment of model performance by ensuring the model works well across different time periods, not just one test set." 
-                minWidth={320} 
-                maxWidth={420} 
-              />
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Model Confidence & Accuracy */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
+      {/* Accuracy + stats */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 32, fontWeight: 800, color: BRAND_BLUE, letterSpacing: -1 }}>
-            {loading ? '—' : (stats.accuracy ?? 0).toFixed(1)}%
+          <span style={{ fontSize: 30, fontWeight: 800, color: BRAND_BLUE, letterSpacing: -1 }}>
+            {loading || accuracy === null ? '—' : `${accuracy.toFixed(1)}%`}
           </span>
           {tooltipsOn && (
-            <InfoTooltip 
-              text="Overall Model Accuracy: This percentage shows how reliable the forecast is. It's calculated by comparing predictions to actual historical values. Higher percentages mean more trustworthy predictions. This accuracy is based on testing the model on data it hasn't seen before." 
-              minWidth={320} 
-              maxWidth={420} 
-            />
+            <InfoTooltip text="Model accuracy: 100 minus mean absolute percentage error. Calculated on withheld test data." />
           )}
         </div>
-        {drivers && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ 
-              fontSize: 12.5, 
-              color: confidenceColor, 
-              fontWeight: 700, 
-              background: drivers.confidence === 'high' ? '#f0fdf4' : drivers.confidence === 'medium' ? '#fefce8' : '#fef2f2', 
-              padding: '3px 7px', 
-              borderRadius: 5,
-              border: `1px solid ${confidenceColor}33`
+        <div style={{ display: 'flex', gap: 6 }}>
+          {[
+            ['MAE', validation ? validation.mae.toFixed(1) : '—', 'Mean Absolute Error. Lower is better.'],
+            ['RMSE', validation ? validation.rmse.toFixed(1) : '—', 'Root Mean Squared Error. Penalises larger errors.'],
+          ].map(([k, v, desc]) => (
+            <div key={k} style={{
+              background: '#e8eef8', borderRadius: 7, padding: '4px 9px',
+              border: '1px solid rgba(9,34,64,0.1)', display: 'flex', alignItems: 'center', gap: 5,
             }}>
-              {drivers.confidence.toUpperCase()} Confidence
-            </span>
-            {tooltipsOn && (
-              <InfoTooltip 
-                text={`Confidence Level: ${drivers.confidence === 'high' ? 'High confidence means predictions are typically within 5% of actual values. Very reliable for planning.' : drivers.confidence === 'medium' ? 'Medium confidence means predictions are typically within 5-15% of actual values. Generally reliable but consider wider ranges.' : 'Low confidence means predictions may vary by more than 15%. Use with caution and consider broader planning ranges.'}`}
-                minWidth={320} 
-                maxWidth={420} 
-              />
-            )}
-          </div>
-        )}
+              <span style={{ fontSize: 9.5, fontWeight: 600, color: '#475569' }}>{k}</span>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_BLUE }}>{v}</span>
+              {tooltipsOn && <InfoTooltip text={desc} />}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Chart */}
       <div style={{ minHeight: 140 }}>
-      {!loading && chartData.length > 0 && (
-        <ResponsiveContainer width="100%" height={140}>
-          <AreaChart data={chartData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
-            <defs>
-              <linearGradient id="confBand95" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={BRAND_BLUE} stopOpacity={0.15} />
-                <stop offset="100%" stopColor={BRAND_BLUE} stopOpacity={0.03} />
-              </linearGradient>
-              <linearGradient id="confBand80" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={BRAND_BLUE} stopOpacity={0.25} />
-                <stop offset="100%" stopColor={BRAND_BLUE} stopOpacity={0.08} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-            <XAxis dataKey="d" tick={{ fontSize: 9.5, fill: '#475569' }} axisLine={false} tickLine={false} />
-            <YAxis domain={[minVal, maxVal]} tick={{ fontSize: 9.5, fill: '#475569' }} axisLine={false} tickLine={false} />
-            <Tooltip 
-              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-              formatter={(value: number, name: string, props: any) => {
-                const isHistorical = props?.payload?.isHistorical;
-                if (name === 'val') return [`${value} beds`, isHistorical ? 'Actual' : 'Predicted'];
-                if (name === 'hi95') return [`${value} beds`, '95% Upper'];
-                if (name === 'lo95') return [`${value} beds`, '95% Lower'];
-                if (name === 'hi80') return [`${value} beds`, '80% Upper'];
-                if (name === 'lo80') return [`${value} beds`, '80% Lower'];
-                return value;
-              }}
-            />
-            {/* Divider line between historical and forecast (for current-week view) */}
-            {dividerDate && (
-              <ReferenceLine 
-                x={dividerDate} 
-                stroke="#475569" 
-                strokeWidth={1.5} 
-                strokeDasharray="3 3" 
-                label={{ value: 'Today', position: 'top', fill: '#374151', fontSize: 10 }}
+        {loading && (
+          <div style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 12 }}>
+            Loading…
+          </div>
+        )}
+        {!loading && chartData.length === 0 && (
+          <div style={{ height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 12 }}>
+            No data available
+          </div>
+        )}
+        {!loading && chartData.length > 0 && (
+          <ResponsiveContainer width="100%" height={140}>
+            <ComposedChart data={chartData} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+              <defs>
+                <linearGradient id="ciBandDash" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={BRAND_BLUE} stopOpacity={0.22} />
+                  <stop offset="100%" stopColor={BRAND_BLUE} stopOpacity={0.04} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="d" tick={{ fontSize: 9.5, fill: '#475569' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis domain={[minVal, maxVal]} tick={{ fontSize: 9.5, fill: '#475569' }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid rgba(0,0,0,0.10)', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                formatter={(value: number | undefined, name: string | undefined) => {
+                  const v = value ?? 0;
+                  if (name === 'upper') return [String(v), 'CI Upper'];
+                  if (name === 'lower') return [String(v), 'CI Lower'];
+                  return [String(v), metricUnit.charAt(0).toUpperCase() + metricUnit.slice(1)];
+                }}
               />
-            )}
-            {/* 95% Confidence Band (only for forecasts) */}
-            {chartData.some(d => !d.isHistorical) && (
-              <>
-                <Area type="monotone" dataKey="hi95" stroke="none" fill="url(#confBand95)" fillOpacity={1} />
-                <Area type="monotone" dataKey="lo95" stroke="none" fill="#fff" fillOpacity={1} />
-                {/* 80% Confidence Band */}
-                <Area type="monotone" dataKey="hi80" stroke="none" fill="url(#confBand80)" fillOpacity={1} />
-                <Area type="monotone" dataKey="lo80" stroke="none" fill="#fff" fillOpacity={1} />
-              </>
-            )}
-            {/* Predicted/Historical Line */}
-            <Area 
-              type="monotone" 
-              dataKey="val" 
-              stroke={chartData.some(d => d.isHistorical) ? (timeWindow === 'current-week' ? BRAND_BLUE : '#374151') : BRAND_BLUE} 
-              strokeWidth={2.5} 
-              strokeDasharray={chartData.some(d => d.isHistorical && timeWindow === 'past-week') ? '5 5' : 'none'}
-              fill="none" 
-              dot={false} 
-            />
-          </AreaChart>
-        </ResponsiveContainer>
-      )}
+              {dividerDate && (
+                <ReferenceLine x={dividerDate} stroke="#475569" strokeWidth={1.5} strokeDasharray="3 3"
+                  label={{ value: 'Now', position: 'top', fill: '#374151', fontSize: 10 }} />
+              )}
+              <Area type="monotone" dataKey="upper" stroke="none" fill="url(#ciBandDash)" fillOpacity={1} legendType="none" dot={false} />
+              <Area type="monotone" dataKey="lower" stroke="none" fill="white" fillOpacity={1} legendType="none" dot={false} />
+              <Line type="monotone" dataKey="val" stroke={BRAND_BLUE} strokeWidth={2.5} dot={false} legendType="none" />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
-      {/* Prediction Drivers */}
-      {drivers && (
-        <div style={{ marginTop: 16, padding: 12, background: 'rgba(0,0,0,0.06)', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: BRAND_BLUE, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-            Prediction Drivers & Model Explanation
-            {tooltipsOn && (
-              <InfoTooltip 
-                text="This section explains what factors the model uses to make predictions. Understanding these drivers helps you interpret the forecast and know when to trust it more or less." 
-                minWidth={280} 
-                maxWidth={380} 
-              />
-            )}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 10.5, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ color: BRAND_BLUE }}>Model Type:</strong> 
-              <span>Linear Regression with trend extrapolation</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Linear Regression: The model finds the best straight line through historical data and extends it forward. It assumes the current trend (increasing or decreasing) will continue. Simple but effective for short-term forecasts." 
-                  minWidth={320} 
-                  maxWidth={420} 
-                />
-              )}
-            </div>
-            <div style={{ fontSize: 10.5, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ color: BRAND_BLUE }}>Trend:</strong> 
-              <span>{drivers.trend.description}</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Trend: Shows whether occupancy is generally going up, down, or staying stable. The strength shows how fast the change is happening. A strong increasing trend means you should expect higher occupancy in the future." 
-                  minWidth={320} 
-                  maxWidth={420} 
-                />
-              )}
-            </div>
-            <div style={{ fontSize: 10.5, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ color: BRAND_BLUE }}>Seasonality:</strong> 
-              <span>{drivers.seasonality.pattern}</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Seasonality: Looks for patterns that repeat weekly. For example, if occupancy is typically higher on certain days of the week, the model accounts for that. If detected, it means there's a predictable weekly rhythm to your data." 
-                  minWidth={320} 
-                  maxWidth={420} 
-                />
-              )}
-            </div>
-            <div style={{ fontSize: 10.5, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ color: BRAND_BLUE }}>Volatility:</strong> 
-              <span>{(drivers.recentVolatility ?? 0).toFixed(1)} beds/day (recent 7-day standard deviation)</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Volatility: Measures how much the occupancy has been jumping around recently. Higher volatility means less predictable patterns - the forecast may be less reliable. Lower volatility means more stable patterns and more reliable predictions." 
-                  minWidth={320} 
-                  maxWidth={420} 
-                />
-              )}
-            </div>
-            <div style={{ fontSize: 10.5, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ color: BRAND_BLUE }}>Historical Average:</strong> 
-              <span>{drivers.historicalAverage} beds (baseline reference)</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Historical Average: The typical occupancy level over the past 60 days. This provides context - if the forecast is much higher or lower than this average, it indicates a significant change from normal operations." 
-                  minWidth={320} 
-                  maxWidth={420} 
-                />
-              )}
-            </div>
-            <div style={{ fontSize: 10.5, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
-              <strong style={{ color: BRAND_BLUE }}>Confidence Level:</strong> 
-              <span>{drivers.confidence} (based on MAPE: {drivers.confidence === 'high' ? '<5%' : drivers.confidence === 'medium' ? '5-15%' : '>15%'})</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Confidence Level: Based on how accurate the model has been when tested on historical data. High confidence means the model has been very accurate in the past, so you can trust these predictions more. Lower confidence means use the forecast as a rough guide." 
-                  minWidth={320} 
-                  maxWidth={420} 
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Legend */}
-      <div style={{ minHeight: 34 }}>
       {!loading && chartData.length > 0 && (
-        <div style={{ display: 'flex', gap: 12, marginTop: 12, fontSize: 10, color: '#374151', justifyContent: 'center', flexWrap: 'wrap' }}>
-          {chartData.some(d => d.isHistorical) && (
+        <div style={{ display: 'flex', gap: 14, marginTop: 10, fontSize: 10, color: '#374151', justifyContent: 'center', flexWrap: 'wrap' }}>
+          {chartData.some(d => !d.isForecast) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 12, height: 12, background: '#374151', borderRadius: 2 }} />
+              <div style={{ width: 14, height: 2, background: '#475569', borderRadius: 1 }} />
               <span>Historical</span>
-              {tooltipsOn && (
-                <InfoTooltip 
-                  text="Historical Data: Actual occupancy values from the past. This shows what really happened, which helps you understand how accurate the forecast model is." 
-                  minWidth={280} 
-                  maxWidth={380} 
-                />
-              )}
             </div>
           )}
-          {chartData.some(d => !d.isHistorical) && (
+          {chartData.some(d => d.isForecast) && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 12, height: 12, background: BRAND_BLUE, borderRadius: 2 }} />
-                <span>Predicted</span>
-                {tooltipsOn && (
-                  <InfoTooltip 
-                    text="Predicted Line: The most likely occupancy value for each future day, based on the linear trend from historical data. This is the model's best guess." 
-                    minWidth={280} 
-                    maxWidth={380} 
-                  />
-                )}
+                <div style={{ width: 14, height: 2, background: BRAND_BLUE, borderRadius: 1 }} />
+                <span>Forecast</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 12, height: 12, background: 'rgba(9,34,64,0.25)' }} />
-                <span>80% CI</span>
-                {tooltipsOn && (
-                  <InfoTooltip 
-                    text="80% Confidence Interval: There's an 80% chance the actual occupancy will fall within this range. The darker band shows where occupancy is most likely to be. Use this for planning with moderate confidence." 
-                    minWidth={320} 
-                    maxWidth={420} 
-                  />
-                )}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <div style={{ width: 12, height: 12, background: 'rgba(9,34,64,0.15)' }} />
+                <div style={{ width: 12, height: 10, background: 'rgba(9,34,64,0.18)', borderRadius: 2 }} />
                 <span>95% CI</span>
-                {tooltipsOn && (
-                  <InfoTooltip 
-                    text="95% Confidence Interval: There's a 95% chance the actual occupancy will fall within this wider range. The lighter band shows the full range of likely outcomes. Use this for conservative planning and worst-case scenarios." 
-                    minWidth={320} 
-                    maxWidth={420} 
-                  />
-                )}
               </div>
             </>
           )}
         </div>
       )}
-      </div>
+
+      {validation && validation.trainSize > 0 && (
+        <div style={{ marginTop: 10, fontSize: 9.5, color: '#64748b', textAlign: 'center' }}>
+          Train: {validation.trainSize} pts · Test: {validation.testSize} pts · 80/20 split
+        </div>
+      )}
     </div>
   );
 }
