@@ -73,6 +73,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     localStorage.setItem('notifPush',  String(notifications.push));
     localStorage.setItem('notifSms',   String(notifications.sms));
     setIsEditing(false);
+    onClose();
   }
 
   function handleCancel() {

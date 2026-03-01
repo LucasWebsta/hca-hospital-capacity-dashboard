@@ -99,7 +99,14 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
   const facilityLabel = selectedFacilityName ?? 'All Facilities';
 
   useEffect(() => {
-    api.getFacilitiesList().then(setFacilities).catch(() => {});
+    api.getFacilitiesList().then(list => {
+      setFacilities(list);
+      const homeId = localStorage.getItem('homeLocation');
+      if (homeId && homeId !== 'all') {
+        const match = list.find(f => String(f.id) === homeId);
+        if (match) onFacilityChange(match.id, match.name);
+      }
+    }).catch(() => {});
   }, []);
 
   function handleFacilitySelect(name: string) {
