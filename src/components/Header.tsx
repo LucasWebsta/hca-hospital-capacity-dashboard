@@ -13,11 +13,17 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-const FACILITIES = [
-  'All Facilities',
-  'Savannah, GA', 'Augusta, GA', 'Macon, GA', 'Columbus, GA',
-  'Atlanta, GA', 'Athens, GA', 'Albany, GA', 'Rome, GA', 'Valdosta, GA', 'Brunswick, GA',
-];
+function getSessionUser(): { firstName: string; lastName: string; role: string } | null {
+  try {
+    const raw = sessionStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function getInitials(user: { firstName: string; lastName: string } | null): string {
+  if (!user) return 'HCA';
+  return `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
+}
 
 const TREND_DAYS: { label: string; value: number }[] = [
   { label: 'Last 7 days', value: 7 },
@@ -76,6 +82,19 @@ function Dropdown({ label, options, onSelect }: {
 }
 
 export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderProps) {
+  const [facilityNames, setFacilityNames] = useState<string[]>(['All Facilities']);
+  const sessionUser = getSessionUser();
+  const initials = getInitials(sessionUser);
+
+  useEffect(() => {
+    fetch('/api/facilities')
+      .then(r => r.json())
+      .then((data: { name: string }[]) => {
+        setFacilityNames(['All Facilities', ...data.map(f => f.name)]);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div style={{
       background: '#fff',
@@ -90,7 +109,7 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderPr
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Dropdown
           label="All Facilities"
-          options={FACILITIES}
+          options={facilityNames}
           onSelect={() => {}}
         />
       </div>
@@ -126,13 +145,13 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderPr
         </button>
 
         {/* Avatar */}
-        <div style={{
+        <div title={sessionUser ? `${sessionUser.firstName} ${sessionUser.lastName}` : ''} style={{
           width: 32, height: 32, borderRadius: '50%',
           background: BRAND_BLUE,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
           boxShadow: `0 1px 6px rgba(9,34,64,0.3)`,
-        }}>ST</div>
+        }}>{initials}</div>
       </div>
     </div>
   );
