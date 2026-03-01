@@ -69,7 +69,7 @@ const server = http.createServer(async (req, res) => {
         const { email, password } = body;
         if (!email || !password) return send(res, 400, { error: 'Email and password are required' });
         const { rows } = await db.query(
-          `SELECT id, first_name, last_name, email, role, password_hash FROM users WHERE email = $1`,
+          `SELECT id, first_name, last_name, email, role, photo_url, password_hash FROM users WHERE email = $1`,
           [email.toLowerCase()]
         );
         if (rows.length === 0) {
@@ -93,7 +93,7 @@ const server = http.createServer(async (req, res) => {
         } catch (_) { /* table may not exist or different schema */ }
         const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role || '');
         return send(res, 200, {
-          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role },
+          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role, photoUrl: user.photo_url || null },
           canAccessAdmin,
         });
       } catch (err) {

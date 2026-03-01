@@ -332,7 +332,7 @@ export function ReportsPanel() {
           {config.sections.includes('overview') && (
             <Section title="Overview">
               {isSnapshotView && data?.census ? (
-                <OverviewBlock census={data.census} facilityName={config.facilityName} />
+                <OverviewBlock census={data.census} />
               ) : (
                 <LiveOverview facilityId={config.facilityId} facilityName={config.facilityName} />
               )}
@@ -405,7 +405,7 @@ function LiveOverview({ facilityId, facilityName }: { facilityId: number | null;
     api.getCensusMetrics(facilityId ?? undefined).then(setCensus).catch(console.error);
   }, [facilityId]);
   if (!census) return <div style={{ padding: 16, color: '#94a3b8' }}>Loading…</div>;
-  return <OverviewBlock census={census} facilityName={facilityName} />;
+  return <OverviewBlock census={census} />;
 }
 
 function OverviewBlock({ census }: { census: CensusMetrics }) {

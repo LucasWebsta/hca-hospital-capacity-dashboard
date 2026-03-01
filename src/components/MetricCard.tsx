@@ -13,12 +13,18 @@ interface MetricCardProps {
   type?: 'normal' | 'alert';
   progressBar?: string;
   accentColor?: string;
+  /** Optional explanation shown when expanded (e.g. by a parent-controlled arrow) */
+  tooltip?: string;
+  /** When true and tooltip is set, show the explanation block below the card content */
+  expanded?: boolean;
 }
 
 export function MetricCard({
   title, value, unit, change, subtext,
   type = 'normal', progressBar,
   accentColor = BRAND_BLUE,
+  tooltip,
+  expanded = false,
 }: MetricCardProps) {
   const isAlert = type === 'alert';
 
@@ -109,6 +115,18 @@ export function MetricCard({
           {subtext && (
             <div style={{ fontSize: 11, color: '#94a3b8', marginTop: progressBar ? 5 : 8, fontWeight: 500 }}>{subtext}</div>
           )}
+        </div>
+      )}
+
+      {tooltip && expanded && (
+        <div style={{
+          marginTop: 8,
+          fontSize: 11.5,
+          lineHeight: 1.4,
+          color: '#64748b',
+          fontWeight: 500,
+        }}>
+          {tooltip}
         </div>
       )}
     </div>
