@@ -9,15 +9,24 @@ const BRAND_ORANGE = '#E75925';
 
 type Series = 'Overall' | 'ICU' | 'Emergency';
 
-export function OccupancyTrendChart() {
+interface OccupancyTrendChartProps {
+  days?: number;
+}
+
+export function OccupancyTrendChart({ days = 30 }: OccupancyTrendChartProps) {
   const [activeSeries, setActiveSeries] = useState<Series>('Overall');
   const [data, setData] = useState<TrendPoint[]>([]);
 
   useEffect(() => {
-    api.getTrend(30).then(setData).catch(console.error);
-  }, []);
+    api.getTrend(days).then(setData).catch(console.error);
+  }, [days]);
 
+  const firstActual = data.find(d => d.actual != null);
   const lastActual = [...data].reverse().find(d => d.actual != null);
+
+  const subtitle = firstActual && lastActual && firstActual !== lastActual
+    ? `${firstActual.date} – ${lastActual.date} · Actual Census`
+    : 'Actual Census';
 
   return (
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 22px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
@@ -26,7 +35,7 @@ export function OccupancyTrendChart() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 700, color: BRAND_BLUE }}>Occupancy Trend</div>
-          <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>Apr 10 – May 7 · Actual + Forecast</div>
+          <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>
         </div>
 
         <div style={{ display: 'flex', gap: 4, background: '#f8fafc', borderRadius: 8, padding: 3, border: '1px solid #edf0f5' }}>
@@ -51,10 +60,14 @@ export function OccupancyTrendChart() {
         <div style={{ marginLeft: 'auto' }}>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_BLUE }}>{lastActual?.actual?.toLocaleString() ?? '—'}</span>
           <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>current census</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_ORANGE, marginLeft: 8 }}>
-            {lastActual ? `${(lastActual as any).occupancy_pct}%` : '—'}
-          </span>
-          <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>occupancy</span>
+          {lastActual?.occupancy_pct != null && (
+            <>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: BRAND_ORANGE, marginLeft: 8 }}>
+                {lastActual.occupancy_pct}%
+              </span>
+              <span style={{ fontSize: 10.5, color: '#94a3b8', marginLeft: 4 }}>occupancy</span>
+            </>
+          )}
         </div>
       </div>
 

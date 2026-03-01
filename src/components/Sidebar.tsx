@@ -1,4 +1,4 @@
-import { BarChart3, Bell, Settings, FileText, Home, Activity } from 'lucide-react';
+import { Bell, Settings, FileText, Home, Activity } from 'lucide-react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -27,21 +27,12 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
     }}>
 
       {/* Logo */}
-      <div style={{ padding: '22px 20px 18px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 36, height: 36,
-            background: BRAND_ORANGE,
-            borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: `0 2px 12px rgba(231,89,37,0.5)`,
-          }}>
-            <BarChart3 size={18} color="#fff" />
-          </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 0.8, color: '#fff', lineHeight: 1 }}>HCA</div>
-            <div style={{ fontSize: 10, color: '#7a9abd', marginTop: 2, letterSpacing: 0.5, fontWeight: 500 }}>Census Command</div>
-          </div>
-        </div>
+      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <img
+          src="/hca-logo.png"
+          alt="HCA Healthcare"
+          style={{ height: 52, width: 'auto', maxWidth: 210, objectFit: 'contain', display: 'block' }}
+        />
       </div>
 
       {/* Nav */}

@@ -1,4 +1,5 @@
-import { ChevronDown, Search, Bell } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, Bell } from 'lucide-react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -12,7 +13,69 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-export function Header() {
+const FACILITIES = [
+  'All Facilities',
+  'Savannah, GA', 'Augusta, GA', 'Macon, GA', 'Columbus, GA',
+  'Atlanta, GA', 'Athens, GA', 'Albany, GA', 'Rome, GA', 'Valdosta, GA', 'Brunswick, GA',
+];
+
+const TREND_DAYS: { label: string; value: number }[] = [
+  { label: 'Last 7 days', value: 7 },
+  { label: 'Last 14 days', value: 14 },
+  { label: 'Last 30 days', value: 30 },
+  { label: 'Last 60 days', value: 60 },
+];
+
+interface HeaderProps {
+  trendDays: number;
+  onTrendDaysChange: (days: number) => void;
+  onAlertsClick: () => void;
+}
+
+function Dropdown({ label, options, onSelect }: {
+  label: string;
+  options: string[];
+  onSelect: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(label);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button style={pill} onClick={() => setOpen(o => !o)}>
+        {selected} <ChevronDown size={13} color="#9ca3af" />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 999,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 170, padding: '4px 0',
+        }}>
+          {options.map(opt => (
+            <button key={opt} onClick={() => { setSelected(opt); onSelect(opt); setOpen(false); }} style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              padding: '7px 14px', fontSize: 12.5, fontWeight: selected === opt ? 600 : 400,
+              color: selected === opt ? BRAND_BLUE : '#374151',
+              background: selected === opt ? '#f0f5ff' : 'transparent',
+              border: 'none', cursor: 'pointer',
+            }}>{opt}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick }: HeaderProps) {
   return (
     <div style={{
       background: '#fff',
@@ -25,43 +88,50 @@ export function Header() {
     }}>
       {/* Left filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button style={pill}>Dashboard <ChevronDown size={13} color="#9ca3af" /></button>
-        <button style={pill}>All Hospitals <ChevronDown size={13} color="#9ca3af" /></button>
-        <button style={pill}>All Service Lines <ChevronDown size={13} color="#9ca3af" /></button>
+        <Dropdown
+          label="All Facilities"
+          options={FACILITIES}
+          onSelect={() => {}}
+        />
       </div>
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button style={pill}>Last 14 days <ChevronDown size={13} color="#9ca3af" /></button>
-        <button style={pill}>Next 7 days <ChevronDown size={13} color="#9ca3af" /></button>
+        <Dropdown
+          label={TREND_DAYS.find(d => d.value === trendDays)?.label ?? 'Last 30 days'}
+          options={TREND_DAYS.map(d => d.label)}
+          onSelect={(v) => {
+            const match = TREND_DAYS.find(d => d.label === v);
+            if (match) onTrendDaysChange(match.value);
+          }}
+        />
 
-        <button style={{
-          ...pill,
-          background: BRAND_BLUE,
-          color: '#fff', borderColor: 'transparent',
-          fontWeight: 600, gap: 6,
-          boxShadow: `0 2px 8px rgba(9,34,64,0.3)`,
-        }}>
-          <Search size={13} color="#fff" /> Filter <ChevronDown size={13} color="rgba(255,255,255,0.7)" />
-        </button>
-
-        {/* Bell */}
-        <button style={{
-          width: 34, height: 34, borderRadius: '50%',
-          background: '#f8fafc', border: '1px solid #e2e8f0',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', marginLeft: 2,
-        }}>
+        {/* Bell → Alerts */}
+        <button
+          onClick={onAlertsClick}
+          title="View Alerts"
+          style={{
+            width: 34, height: 34, borderRadius: '50%',
+            background: '#f8fafc', border: '1px solid #e2e8f0',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', marginLeft: 2, position: 'relative',
+          }}
+        >
           <Bell size={15} color={BRAND_BLUE} />
+          <span style={{
+            position: 'absolute', top: 4, right: 4,
+            width: 7, height: 7, borderRadius: '50%',
+            background: BRAND_ORANGE, border: '1.5px solid #fff',
+          }} />
         </button>
 
         {/* Avatar */}
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: BRAND_ORANGE,
+          background: BRAND_BLUE,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
-          boxShadow: `0 1px 6px rgba(231,89,37,0.4)`,
+          boxShadow: `0 1px 6px rgba(9,34,64,0.3)`,
         }}>ST</div>
       </div>
     </div>

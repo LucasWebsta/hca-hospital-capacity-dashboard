@@ -14,6 +14,7 @@ import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [trendDays, setTrendDays] = useState(30);
   const [census, setCensus] = useState<CensusMetrics>({
     totalCensus: 948, totalCapacity: 1112, occupancyRate: 85.2, sevenDayForecast: 963,
   });
@@ -27,7 +28,11 @@ function App() {
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Header />
+        <Header
+          trendDays={trendDays}
+          onTrendDaysChange={setTrendDays}
+          onAlertsClick={() => setActiveTab('alerts')}
+        />
 
         {activeTab === 'dashboard' && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
@@ -83,7 +88,7 @@ function App() {
                 </div>
 
                 {/* Occupancy Trend chart */}
-                <OccupancyTrendChart />
+                <OccupancyTrendChart days={trendDays} />
 
                 {/* Facilities table */}
                 <FacilitiesAtRisk />
