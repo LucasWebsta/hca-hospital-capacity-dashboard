@@ -35,8 +35,8 @@ export function Sidebar({ activeTab, onTabChange, facilityName, isOpen = true, o
     <div style={{
       width: 224, minWidth: 224,
       background: 'rgba(6,21,37,0.82)',
-      backdropFilter: 'blur(4px)',
-      WebkitBackdropFilter: 'blur(4px)',
+      backdropFilter: 'blur(6px)',
+      WebkitBackdropFilter: 'blur(6px)',
       color: '#fff', display: 'flex', flexDirection: 'column', height: '100vh',
       boxShadow: '2px 0 32px rgba(0,0,0,0.4)',
       position: isMobile ? 'fixed' : 'relative',
@@ -73,7 +73,7 @@ export function Sidebar({ activeTab, onTabChange, facilityName, isOpen = true, o
       {/* Logo */}
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <img
-          src="/hca-logo.png"
+          src="/hca-logo-full.png"
           alt="HCA Healthcare"
           style={{ height: 52, width: 'auto', maxWidth: 210, objectFit: 'contain', display: 'block' }}
         />

@@ -181,11 +181,11 @@ function App() {
               >
                 <div
                   style={{
-                    background: "rgba(255,255,255,0.65)",
-                    backdropFilter: "blur(4px)",
-                    WebkitBackdropFilter: "blur(4px)",
+                    background: "rgba(255,255,255,0.88)",
+                    backdropFilter: "blur(6px)",
+                    WebkitBackdropFilter: "blur(6px)",
                     borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.65)",
+                    border: "1px solid rgba(255,255,255,0.88)",
                     padding: "20px 22px",
                     boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
                   }}
@@ -341,7 +341,7 @@ function App() {
               style={{
                 marginTop: 24,
                 paddingTop: 16,
-                borderTop: "1px solid #e2e8f0",
+                borderTop: "1px solid rgba(0,0,0,0.08)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "flex-end",
@@ -351,7 +351,18 @@ function App() {
             >
               <label
                 htmlFor="metric-tooltips-toggle"
-                style={{ fontSize: 12.5, color: "#374151", fontWeight: 500, cursor: "pointer" }}
+                style={{
+                  fontSize: 12.5,
+                  color: "#1e293b",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: "rgba(255,255,255,0.88)",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "1px solid rgba(0,0,0,0.08)",
+                }}
               >
                 Show explanations and tooltips
               </label>

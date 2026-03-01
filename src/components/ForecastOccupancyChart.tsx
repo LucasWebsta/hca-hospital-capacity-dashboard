@@ -123,7 +123,7 @@ export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { faci
     : null;
 
   return (
-    <div style={{ background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)', padding: '20px 20px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
+    <div style={{ background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: 12, border: '1px solid rgba(255,255,255,0.88)', padding: '20px 20px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>

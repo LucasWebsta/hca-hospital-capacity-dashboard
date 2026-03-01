@@ -52,8 +52,8 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 }
 
 const card: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-  borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)',
+  background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+  borderRadius: 12, border: '1px solid rgba(255,255,255,0.88)',
   padding: '18px 20px', boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
 };
 const fLabel: React.CSSProperties = {
@@ -121,7 +121,7 @@ export function AlertsPanel(_props: { tooltipsOn?: boolean } = {}) {
   const hasHigh = visibleAlerts.some(a => a.severity === 'HIGH');
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px', background: '#edf1f8' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 296px', gap: 18, alignItems: 'start', maxWidth: 1400 }}>
 
         {/* ── LEFT ── */}

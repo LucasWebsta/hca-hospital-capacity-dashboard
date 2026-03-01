@@ -106,11 +106,11 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
   return (
     <div
       style={{
-        background: 'rgba(255,255,255,0.65)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
+        background: 'rgba(255,255,255,0.55)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
         borderRadius: 14,
-        border: '1px solid rgba(255,255,255,0.65)',
+        border: '1px solid rgba(255,255,255,0.4)',
         overflow: 'hidden',
         boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       }}
@@ -171,7 +171,7 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
       {/* Map canvas — glass-tinted so background image shows through */}
       <div style={{
         position: 'relative',
-        background: 'rgba(10, 22, 48, 0.55)',
+        background: 'rgba(9, 34, 64, 0.06)',
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
       }}>
@@ -197,12 +197,12 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
                 <Geography
                   key={geo.rsmKey}
                   geography={geo}
-                  fill="rgba(26, 50, 96, 0.75)"
-                  stroke="#2a4a82"
+                  fill="rgba(9, 34, 64, 0.12)"
+                    stroke="rgba(9, 34, 64, 0.2)"
                   strokeWidth={0.6}
                   style={{
                     default: { outline: 'none' },
-                    hover:   { outline: 'none', fill: 'rgba(30, 58, 112, 0.85)' },
+                    hover:   { outline: 'none', fill: 'rgba(9, 34, 64, 0.22)' },
                     pressed: { outline: 'none' },
                   }}
                 />
@@ -255,7 +255,7 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
                 <circle
                   r={r}
                   fill={color}
-                  stroke={isSelected ? '#fff' : 'rgba(255,255,255,0.65)'}
+                  stroke={isSelected ? '#fff' : 'rgba(255,255,255,0.88)'}
                   strokeWidth={isSelected ? 2.5 : 1.8}
                   filter="url(#marker-glow)"
                   style={{ cursor: 'pointer' }}
@@ -268,14 +268,16 @@ export function FacilityMap({ selectedFacilityId, defaultFacilityId, onFacilityS
                   <text
                     y={r + 11}
                     textAnchor="middle"
+                    stroke="rgba(255,255,255,0.95)"
+                    strokeWidth={3}
+                    paintOrder="stroke"
                     style={{
-                      fontSize: 8,
+                      fontSize: 9,
                       fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-                      fontWeight: 700,
+                      fontWeight: 800,
                       fill: color,
                       pointerEvents: 'none',
                       userSelect: 'none',
-                      filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.9))',
                     }}
                   >
                     {pct}%

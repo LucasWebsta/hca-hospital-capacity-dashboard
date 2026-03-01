@@ -77,11 +77,11 @@ export function AlertsWidget({ facilityId }: AlertsWidgetProps) {
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.65)',
-      backdropFilter: 'blur(4px)',
-      WebkitBackdropFilter: 'blur(4px)',
+      background: 'rgba(255,255,255,0.88)',
+      backdropFilter: 'blur(6px)',
+      WebkitBackdropFilter: 'blur(6px)',
       borderRadius: 12,
-      border: '1px solid rgba(255,255,255,0.65)',
+      border: '1px solid rgba(255,255,255,0.88)',
       boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
       display: 'flex',
       flexDirection: 'column',

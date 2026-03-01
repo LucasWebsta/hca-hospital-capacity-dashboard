@@ -72,9 +72,9 @@ function Dropdown({ label, options, onSelect }: {
       </button>
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 999,
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 9999,
           background: '#fff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 170, padding: '4px 0',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.14)', minWidth: 170, padding: '4px 0',
         }}>
           {options.map(opt => (
             <button key={opt} onClick={() => { setSelected(opt); onSelect(opt); setOpen(false); }} style={{
@@ -129,15 +129,17 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
 
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.65)',
-      backdropFilter: 'blur(4px)',
-      WebkitBackdropFilter: 'blur(4px)',
+      background: 'rgba(255,255,255,0.88)',
+      backdropFilter: 'blur(6px)',
+      WebkitBackdropFilter: 'blur(6px)',
       borderBottom: `3px solid ${BRAND_ORANGE}`,
       padding: isMobile ? '0 12px' : '0 24px',
       height: isMobile ? 50 : 54,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       flexShrink: 0,
       boxShadow: '0 2px 8px rgba(9,34,64,0.08)',
+      position: 'relative',
+      zIndex: 200,
     }}>
       {/* Left filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 6, flex: 1, minWidth: 0 }}>

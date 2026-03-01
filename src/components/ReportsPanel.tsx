@@ -172,11 +172,14 @@ export function ReportsPanel() {
 
       {isSnapshotView && snapshot && (
         <div style={{
-          background: '#e8eef8',
-          border: `1px solid ${BRAND_BLUE}`,
+          background: 'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
+          border: `1px solid rgba(255,255,255,0.88)`,
           borderRadius: 10,
           padding: '12px 16px',
           marginBottom: 16,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -202,8 +205,8 @@ export function ReportsPanel() {
         {/* Config sidebar */}
         <div style={{
           width: 260, flexShrink: 0,
-          background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-          borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)',
+          background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+          borderRadius: 12, border: '1px solid rgba(255,255,255,0.88)',
           padding: 16, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           height: 'fit-content',
         }}>
@@ -317,8 +320,8 @@ export function ReportsPanel() {
           ref={reportRef}
           id="report-content"
           style={{
-            flex: 1, overflowY: 'auto', background: 'rgba(255,255,255,0.65)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
-            borderRadius: 12, border: '1px solid rgba(255,255,255,0.65)', padding: 24, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
+            flex: 1, overflowY: 'auto', background: 'rgba(255,255,255,0.88)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)',
+            borderRadius: 12, border: '1px solid rgba(255,255,255,0.88)', padding: 24, boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
           }}
         >
           <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
