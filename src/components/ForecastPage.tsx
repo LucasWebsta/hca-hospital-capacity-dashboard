@@ -730,7 +730,16 @@ export default function ForecastPage() {
                   </li>
                 </ul>
                 <p style={{ margin: "12px 0 0", fontSize: 11, color: "#94a3b8" }}>
-                  Ratios can be calibrated with <code style={{ background: "#e2e8f0", padding: "1px 4px", borderRadius: 4 }}>scripts/staffing_projection.py</code> using the Kaggle hospital capacity dataset.
+                  Ratios are calculated using the{" "}
+                  <a
+                    href="https://www.kaggle.com/datasets/endernel/capacity-of-hospitals-bed"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: BRAND_BLUE, fontWeight: 600 }}
+                  >
+                    Kaggle hospital capacity dataset
+                  </a>
+                  
                 </p>
               </div>
             )}
