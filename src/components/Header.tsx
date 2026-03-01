@@ -40,8 +40,6 @@ interface HeaderProps {
   onTrendDaysChange: (days: number) => void;
   onAlertsClick: () => void;
   onFacilityChange: (facilityId: number | null, name: string) => void;
-  /** Current facility selection from parent (keeps dropdown in sync with dashboard/reports). */
-  selectedFacilityId?: number | null;
   selectedFacilityName?: string;
 }
 
@@ -92,7 +90,7 @@ function Dropdown({ label, options, onSelect }: {
   );
 }
 
-export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityId = null, selectedFacilityName }: HeaderProps) {
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityName }: HeaderProps) {
   const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
   const sessionUser = getSessionUser();
   const initials = getInitials(sessionUser);
@@ -168,15 +166,16 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
         </button>
 
         {/* Avatar + profile dropdown */}
-        <AvatarMenu initials={initials} sessionUser={sessionUser} />
+        <AvatarMenu initials={initials} sessionUser={sessionUser} onFacilityChange={onFacilityChange} />
       </div>
     </div>
   );
 }
 
-function AvatarMenu({ initials, sessionUser }: {
+function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
   initials: string;
   sessionUser: { firstName: string; lastName: string; role: string } | null;
+  onFacilityChange: (id: number | null, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -254,7 +253,7 @@ function AvatarMenu({ initials, sessionUser }: {
         </div>
       )}
 
-      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} onFacilityChange={onFacilityChange} />
     </div>
   );
 }
