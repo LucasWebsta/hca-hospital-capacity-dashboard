@@ -18,8 +18,8 @@ import { ForecastOccupancyChart } from "./ForecastOccupancyChart";
 
 const METRICS = ["Admissions", "Discharges", "ICU Occupancy", "Total Census"];
 
-const BRAND_BLUE = '#092240';
-const BRAND_ORANGE = '#E75925';
+const BRAND_BLUE = "#092240";
+const BRAND_ORANGE = "#E75925";
 
 export default function ForecastPage() {
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -27,9 +27,13 @@ export default function ForecastPage() {
   const [selectedFacility, setSelectedFacility] = useState<number | null>(null);
   const [selectedMetric, setSelectedMetric] = useState("Admissions");
   const [forecastHorizon, setForecastHorizon] = useState(168); // hours ahead to forecast (default 7 days)
-  const [historicalRange, setHistoricalRange] = useState<number | 'all'>('all'); // days back to show, or 'all'
-  const [displayWindow, setDisplayWindow] = useState<'historical' | 'forecast' | 'both'>('both');
-  const [timeGranularity, setTimeGranularity] = useState<'15min' | 'hourly' | '12hour' | 'daily'>('15min');
+  const [historicalRange, setHistoricalRange] = useState<number | "all">("all"); // days back to show, or 'all'
+  const [displayWindow, setDisplayWindow] = useState<
+    "historical" | "forecast" | "both"
+  >("both");
+  const [timeGranularity, setTimeGranularity] = useState<
+    "15min" | "hourly" | "12hour" | "daily"
+  >("15min");
   const [loading, setLoading] = useState(true);
   const [validation, setValidation] = useState<ValidationMetrics | null>(null);
 
@@ -71,10 +75,13 @@ export default function ForecastPage() {
 
   // Calculate display time ranges
   const now = new Date();
-  const historicalCutoff = historicalRange === 'all' 
-    ? null 
-    : new Date(now.getTime() - historicalRange * 24 * 60 * 60 * 1000);
-  const forecastEnd = new Date(now.getTime() + forecastHorizon * 60 * 60 * 1000);
+  const historicalCutoff =
+    historicalRange === "all"
+      ? null
+      : new Date(now.getTime() - historicalRange * 24 * 60 * 60 * 1000);
+  const forecastEnd = new Date(
+    now.getTime() + forecastHorizon * 60 * 60 * 1000,
+  );
 
   // Always calculate forecast using ALL available historical data
   // But only display what user selects
@@ -88,11 +95,13 @@ export default function ForecastPage() {
     if (historicalCutoff && !p.isForecast && p.timestamp < historicalCutoff) {
       return false;
     }
-    
+
     // Filter by display window preference
-    if (displayWindow === 'historical') {
-      return !p.isForecast && (!historicalCutoff || p.timestamp >= historicalCutoff);
-    } else if (displayWindow === 'forecast') {
+    if (displayWindow === "historical") {
+      return (
+        !p.isForecast && (!historicalCutoff || p.timestamp >= historicalCutoff)
+      );
+    } else if (displayWindow === "forecast") {
       return p.isForecast && p.timestamp <= forecastEnd;
     } else {
       // 'both' - show historical (within range) and forecast (within horizon)
@@ -107,28 +116,31 @@ export default function ForecastPage() {
   // Aggregate data based on selected granularity
   function aggregateDataByGranularity(
     data: Array<{ timestamp: Date; value: number; isForecast: boolean }>,
-    granularity: '15min' | 'hourly' | '12hour' | 'daily'
+    granularity: "15min" | "hourly" | "12hour" | "daily",
   ): Array<{ timestamp: Date; value: number; isForecast: boolean }> {
-    if (granularity === '15min') {
+    if (granularity === "15min") {
       return data; // No aggregation needed
     }
 
-    const aggregated = new Map<string, { values: number[]; timestamps: Date[]; isForecast: boolean }>();
+    const aggregated = new Map<
+      string,
+      { values: number[]; timestamps: Date[]; isForecast: boolean }
+    >();
 
     data.forEach((point) => {
       let key: string;
       const date = new Date(point.timestamp);
 
-      if (granularity === 'hourly') {
+      if (granularity === "hourly") {
         // Round to nearest hour
         date.setMinutes(0, 0, 0);
         key = date.toISOString();
-      } else if (granularity === '12hour') {
+      } else if (granularity === "12hour") {
         // Round to nearest 12-hour period (midnight or noon)
         const hour = date.getHours();
         date.setHours(hour < 12 ? 0 : 12, 0, 0, 0);
         key = date.toISOString();
-      } else if (granularity === 'daily') {
+      } else if (granularity === "daily") {
         // Round to start of day
         date.setHours(0, 0, 0, 0);
         key = date.toISOString();
@@ -150,46 +162,60 @@ export default function ForecastPage() {
     });
 
     // Average values for each time bucket, but use weighted average for smoother transitions
-    return Array.from(aggregated.entries()).map(([key, entry]) => {
-      // For forecast data, use median to reduce impact of outliers
-      // For historical data, use mean
-      let avgValue: number;
-      if (entry.isForecast && entry.values.length > 1) {
-        const sorted = [...entry.values].sort((a, b) => a - b);
-        const mid = Math.floor(sorted.length / 2);
-        avgValue = sorted.length % 2 === 0
-          ? (sorted[mid - 1] + sorted[mid]) / 2
-          : sorted[mid];
-      } else {
-        avgValue = entry.values.reduce((a, b) => a + b, 0) / entry.values.length;
-      }
-      
-      // Use the middle timestamp in the bucket for better representation
-      const timestamps = entry.timestamps.map(t => t.getTime()).sort((a, b) => a - b);
-      const midTime = timestamps[Math.floor(timestamps.length / 2)];
-      const representativeTime = new Date(midTime);
-      
-      return {
-        timestamp: representativeTime,
-        value: Math.round(avgValue),
-        isForecast: entry.isForecast,
-      };
-    }).sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+    return Array.from(aggregated.entries())
+      .map(([key, entry]) => {
+        // For forecast data, use median to reduce impact of outliers
+        // For historical data, use mean
+        let avgValue: number;
+        if (entry.isForecast && entry.values.length > 1) {
+          const sorted = [...entry.values].sort((a, b) => a - b);
+          const mid = Math.floor(sorted.length / 2);
+          avgValue =
+            sorted.length % 2 === 0
+              ? (sorted[mid - 1] + sorted[mid]) / 2
+              : sorted[mid];
+        } else {
+          avgValue =
+            entry.values.reduce((a, b) => a + b, 0) / entry.values.length;
+        }
+
+        // Use the middle timestamp in the bucket for better representation
+        const timestamps = entry.timestamps
+          .map((t) => t.getTime())
+          .sort((a, b) => a - b);
+        const midTime = timestamps[Math.floor(timestamps.length / 2)];
+        const representativeTime = new Date(midTime);
+
+        return {
+          timestamp: representativeTime,
+          value: Math.round(avgValue),
+          isForecast: entry.isForecast,
+        };
+      })
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
-  const aggregatedData = aggregateDataByGranularity(filteredData, timeGranularity);
+  const aggregatedData = aggregateDataByGranularity(
+    filteredData,
+    timeGranularity,
+  );
 
   const chartData = aggregatedData.map((p) => {
     // Format time based on granularity
     let timeFormat: Intl.DateTimeFormatOptions;
-    if (timeGranularity === 'daily') {
+    if (timeGranularity === "daily") {
       timeFormat = { month: "short", day: "numeric" };
-    } else if (timeGranularity === '12hour') {
+    } else if (timeGranularity === "12hour") {
       timeFormat = { month: "short", day: "numeric", hour: "2-digit" };
-    } else if (timeGranularity === 'hourly') {
+    } else if (timeGranularity === "hourly") {
       timeFormat = { month: "short", day: "numeric", hour: "2-digit" };
     } else {
-      timeFormat = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+      timeFormat = {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      };
     }
 
     return {
@@ -223,12 +249,15 @@ export default function ForecastPage() {
     peakForecast.length > 0 ? Math.max(...peakForecast.map((p) => p.value)) : 0;
 
   // Find divider time for 'both' view (where historical ends and forecast begins)
-  const dividerTime = displayWindow === 'both' && chartData.length > 0
-    ? (() => {
-        const firstForecastIdx = chartData.findIndex(d => !d.isHistorical);
-        return firstForecastIdx > 0 ? chartData[firstForecastIdx - 1].time : null;
-      })()
-    : null;
+  const dividerTime =
+    displayWindow === "both" && chartData.length > 0
+      ? (() => {
+          const firstForecastIdx = chartData.findIndex((d) => !d.isHistorical);
+          return firstForecastIdx > 0
+            ? chartData[firstForecastIdx - 1].time
+            : null;
+        })()
+      : null;
 
   if (loading) {
     return (
@@ -324,7 +353,10 @@ export default function ForecastPage() {
             }}
           >
             {facilities.map((f, idx) => (
-              <option key={`facility-${f.facilityId}-${idx}`} value={f.facilityId}>
+              <option
+                key={`facility-${f.facilityId}-${idx}`}
+                value={f.facilityId}
+              >
                 {f.location}
               </option>
             ))}
@@ -409,7 +441,11 @@ export default function ForecastPage() {
           </label>
           <select
             value={historicalRange}
-            onChange={(e) => setHistoricalRange(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            onChange={(e) =>
+              setHistoricalRange(
+                e.target.value === "all" ? "all" : Number(e.target.value),
+              )
+            }
             style={{
               border: "1px solid #e2e8f0",
               borderRadius: 6,
@@ -440,7 +476,11 @@ export default function ForecastPage() {
           </label>
           <select
             value={displayWindow}
-            onChange={(e) => setDisplayWindow(e.target.value as 'historical' | 'forecast' | 'both')}
+            onChange={(e) =>
+              setDisplayWindow(
+                e.target.value as "historical" | "forecast" | "both",
+              )
+            }
             style={{
               border: "1px solid #e2e8f0",
               borderRadius: 6,
@@ -468,7 +508,11 @@ export default function ForecastPage() {
           </label>
           <select
             value={timeGranularity}
-            onChange={(e) => setTimeGranularity(e.target.value as '15min' | 'hourly' | '12hour' | 'daily')}
+            onChange={(e) =>
+              setTimeGranularity(
+                e.target.value as "15min" | "hourly" | "12hour" | "daily",
+              )
+            }
             style={{
               border: "1px solid #e2e8f0",
               borderRadius: 6,
@@ -610,7 +654,16 @@ export default function ForecastPage() {
           boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 16,
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
           <div>
             <div
               style={{
@@ -620,10 +673,17 @@ export default function ForecastPage() {
                 marginBottom: 4,
               }}
             >
-              {selectedMetric} — {displayWindow === 'historical' ? 'Historical' : displayWindow === 'forecast' ? 'Forecast' : 'Historical + Forecast'} (Seasonality-Adjusted)
+              {selectedMetric} —{" "}
+              {displayWindow === "historical"
+                ? "Historical"
+                : displayWindow === "forecast"
+                  ? "Forecast"
+                  : "Historical + Forecast"}{" "}
+              (Seasonality-Adjusted)
             </div>
             <div style={{ fontSize: 11.5, color: "#94a3b8" }}>
-              {facility?.location} · Trend-seasonal hybrid model with holiday adjustments
+              {facility?.location} · Trend-seasonal hybrid model with holiday
+              adjustments
             </div>
           </div>
         </div>
@@ -646,12 +706,17 @@ export default function ForecastPage() {
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {/* Divider line between historical and forecast (for 'both' view) */}
             {dividerTime && (
-              <ReferenceLine 
-                x={dividerTime} 
-                stroke="#94a3b8" 
-                strokeWidth={1.5} 
-                strokeDasharray="3 3" 
-                label={{ value: 'Today', position: 'top', fill: '#64748b', fontSize: 10 }}
+              <ReferenceLine
+                x={dividerTime}
+                stroke="#94a3b8"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
+                label={{
+                  value: "Today",
+                  position: "top",
+                  fill: "#64748b",
+                  fontSize: 10,
+                }}
               />
             )}
             <ReferenceLine
@@ -660,19 +725,21 @@ export default function ForecastPage() {
               strokeDasharray="4 4"
               label={{ value: "90% capacity", fill: "#ef4444", fontSize: 10 }}
             />
-            {chartData.some(d => d.actual !== null) && (
+            {chartData.some((d) => d.actual !== null) && (
               <Line
                 type="monotone"
                 dataKey="actual"
-                stroke={displayWindow === 'historical' ? '#64748b' : BRAND_BLUE}
+                stroke={displayWindow === "historical" ? "#64748b" : BRAND_BLUE}
                 strokeWidth={2}
-                strokeDasharray={displayWindow === 'historical' ? '5 5' : 'none'}
+                strokeDasharray={
+                  displayWindow === "historical" ? "5 5" : "none"
+                }
                 dot={false}
                 name="Actual"
                 connectNulls={false}
               />
             )}
-            {chartData.some(d => d.forecast !== null) && (
+            {chartData.some((d) => d.forecast !== null) && (
               <Line
                 type="monotone"
                 dataKey="forecast"
