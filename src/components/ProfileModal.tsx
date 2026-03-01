@@ -1,371 +1,358 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera, X, Save, Edit2, LogOut } from 'lucide-react';
+
+// HCA Brand colors: Blue #092240 | Orange #E75925
+const BRAND_BLUE = '#092240';
+const BRAND_ORANGE = '#E75925';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onFacilityChange?: (id: number | null, name: string) => void;
 }
 
-// Get user info from sessionStorage (from login)
-const getUserInfo = () => {
-  if (typeof window !== 'undefined') {
-    const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      return {
-        firstName: user.firstName || 'John',
-        lastName: user.lastName || 'Doe',
-        role: user.role || 'Executive Director',
-        email: user.email || '',
-      };
-    }
-  }
-  return {
-    firstName: typeof window !== 'undefined' ? (localStorage.getItem('userFirstName') || 'John') : 'John',
-    lastName: typeof window !== 'undefined' ? (localStorage.getItem('userLastName') || 'Doe') : 'Doe',
-    role: typeof window !== 'undefined' ? (localStorage.getItem('userRole') || 'Executive Director') : 'Executive Director',
-    email: '',
-  };
-};
+interface FacilityOption {
+  id: number;
+  name: string;
+}
 
-export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const initialUser = getUserInfo();
-  const [firstName, setFirstName] = useState(initialUser.firstName);
-  const [lastName, setLastName] = useState(initialUser.lastName);
-  const [role, setRole] = useState(initialUser.role);
-  const [homeLocation, setHomeLocation] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('homeLocation') || 'all';
-    }
-    return 'all';
-  });
-  const [profilePicture, setProfilePicture] = useState<string | null>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('profilePicture');
-    }
-    return null;
-  });
+export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModalProps) {
+  const sessionUser = (() => {
+    try {
+      const raw = sessionStorage.getItem('user');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
   const [isEditing, setIsEditing] = useState(false);
+  const [firstName, setFirstName] = useState(sessionUser?.firstName ?? 'User');
+  const [lastName, setLastName] = useState(sessionUser?.lastName ?? '');
+  const [role] = useState(sessionUser?.role ?? '');
+  const [email] = useState(sessionUser?.email ?? '');
+  const [facilities, setFacilities] = useState<FacilityOption[]>([]);
+  const [homeLocation, setHomeLocation] = useState<string>(
+    () => localStorage.getItem('homeLocation') ?? 'all'
+  );
+  const [profilePicture, setProfilePicture] = useState<string | null>(
+    () => localStorage.getItem('profilePicture') ?? sessionUser?.photoUrl ?? null
+  );
+  const [notifications, setNotifications] = useState({
+    email: localStorage.getItem('notifEmail') !== 'false',
+    push:  localStorage.getItem('notifPush')  !== 'false',
+    sms:   localStorage.getItem('notifSms')   === 'true',
+  });
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/facilitiesList')
+      .then(r => r.json())
+      .then(setFacilities)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       // Refresh user info from sessionStorage when modal opens
-      const userInfo = getUserInfo();
-      setFirstName(userInfo.firstName);
-      setLastName(userInfo.lastName);
-      setRole(userInfo.role);
+      if (sessionUser) {
+        setFirstName(sessionUser.firstName ?? 'User');
+        setLastName(sessionUser.lastName ?? '');
+      }
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      setIsEditing(false);
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen]);
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen, sessionUser]);
 
-  const handlePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  function handlePictureChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        setProfilePicture(result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const result = ev.target?.result as string;
+      setProfilePicture(result);
+      localStorage.setItem('profilePicture', result);
+    };
+    reader.readAsDataURL(file);
+  }
 
-  const handleSave = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('userFirstName', firstName);
-      localStorage.setItem('userLastName', lastName);
-      localStorage.setItem('userRole', role);
-      localStorage.setItem('homeLocation', homeLocation);
-      if (profilePicture) {
-        localStorage.setItem('profilePicture', profilePicture);
+  function handleSave() {
+    localStorage.setItem('homeLocation', homeLocation);
+    localStorage.setItem('notifEmail', String(notifications.email));
+    localStorage.setItem('notifPush',  String(notifications.push));
+    localStorage.setItem('notifSms',   String(notifications.sms));
+    setIsEditing(false);
+    // update the active dashboard filter to reflect the new home hospital
+    if (onFacilityChange) {
+      if (homeLocation === 'all') {
+        onFacilityChange(null, 'All Facilities');
+      } else {
+        const match = facilities.find(f => String(f.id) === homeLocation);
+        if (match) onFacilityChange(match.id, match.name);
       }
     }
-    setIsEditing(false);
-    // In a real app, you would send this to your backend API
-    console.log('Settings saved:', { firstName, lastName, role, homeLocation });
-  };
+    onClose();
+  }
 
-  const handleCancel = () => {
-    if (typeof window !== 'undefined') {
-      setFirstName(localStorage.getItem('userFirstName') || 'John');
-      setLastName(localStorage.getItem('userLastName') || 'Doe');
-      setRole(localStorage.getItem('userRole') || 'Executive Director');
-      setHomeLocation(localStorage.getItem('homeLocation') || 'all');
-      setProfilePicture(localStorage.getItem('profilePicture'));
+  function handleCancel() {
+    setFirstName(sessionUser?.firstName ?? 'User');
+    setLastName(sessionUser?.lastName ?? '');
+    setHomeLocation(localStorage.getItem('homeLocation') ?? 'all');
+    setNotifications({
+      email: localStorage.getItem('notifEmail') !== 'false',
+      push:  localStorage.getItem('notifPush')  !== 'false',
+      sms:   localStorage.getItem('notifSms')   === 'true',
+    });
+    setIsEditing(false);
+  }
+
+  async function handleLogout() {
+    const userStr = sessionStorage.getItem('user');
+    let userId = null;
+    let userName = 'Unknown';
+    
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      userId = user.id;
+      userName = `${user.firstName} ${user.lastName}`;
     }
-    setIsEditing(false);
-  };
+    
+    try {
+      // Call logout API
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId, userName })
+      });
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with logout even if API call fails
+    }
+    
+    // Clear session storage and redirect to login
+    sessionStorage.clear();
+    window.location.href = '/login.html';
+  }
 
-  const getLocationText = () => {
-    const locations: { [key: string]: string } = {
-      'all': 'All Facilities',
-      'facility1': 'Memorial Hospital',
-      'facility2': 'Regional Medical Center',
-      'facility3': 'Community Hospital',
-      'facility4': 'University Medical Center',
-      'facility5': 'General Hospital'
-    };
-    return locations[homeLocation] || 'All Facilities';
-  };
+  const initials = `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase() || 'HCA';
+  const homeName = homeLocation === 'all'
+    ? 'All Facilities'
+    : facilities.find(f => String(f.id) === homeLocation)?.name ?? 'All Facilities';
 
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
+    <div
       onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(9,34,64,0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      }}
     >
-      <div 
-        className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#fff', borderRadius: 14,
+          width: '100%', maxWidth: 760,
+          maxHeight: '90vh', overflowY: 'auto',
+          boxShadow: '0 24px 60px rgba(9,34,64,0.25)',
+        }}
       >
-        {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">User Profile</h2>
+        {/* Modal Header */}
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 10,
+          background: '#fff',
+          borderBottom: `3px solid ${BRAND_ORANGE}`,
+          padding: '16px 24px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: BRAND_BLUE, letterSpacing: -0.3 }}>
+            User Profile
+          </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition"
+            style={{
+              width: 30, height: 30, borderRadius: '50%',
+              background: '#f1f5f9', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <X size={15} color="#64748b" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* LEFT SIDE - Profile Information */}
-            <div className="lg:col-span-1">
-              <div className="bg-gray-50 rounded-xl p-6">
-                {/* Profile Picture */}
-                <div className="flex justify-center mb-6">
-                  <div className="relative">
-                    <img 
-                      src={profilePicture || `https://ui-avatars.com/api/?name=${firstName}+${lastName}&background=E75925&color=fff&size=150&bold=true`}
-                      alt="Profile Picture" 
-                      className="w-32 h-32 rounded-full border-4 border-white shadow-lg object-cover"
-                    />
-                    <button 
-                      onClick={() => document.getElementById('pictureInput')?.click()}
-                      className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 shadow-lg hover:bg-blue-700 transition"
-                      title="Change profile picture"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                      </svg>
-                    </button>
-                    <input 
-                      type="file" 
-                      id="pictureInput" 
-                      accept="image/*" 
-                      className="hidden"
-                      onChange={handlePictureChange}
-                    />
-                  </div>
-                </div>
+        {/* Body */}
+        <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 0 }}>
 
-                {/* Name and Role */}
-                {isEditing ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                      <input
-                        type="text"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                      <input
-                        type="text"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                      <input
-                        type="text"
-                        value={role}
-                        onChange={(e) => setRole(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center">
-                    <h3 className="text-2xl font-bold text-gray-900 mb-1">{firstName} {lastName}</h3>
-                    <p className="text-gray-600 text-lg">{role}</p>
-                  </div>
-                )}
-
-                {/* Edit Button */}
-                <button 
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="w-full mt-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition"
-                >
-                  {isEditing ? 'Cancel Edit' : 'Edit Profile Information'}
-                </button>
-              </div>
+          {/* LEFT — Avatar + identity */}
+          <div style={{
+            borderRight: '1px solid #f1f5f9',
+            padding: '28px 20px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
+          }}>
+            {/* Avatar */}
+            <div style={{ position: 'relative' }}>
+              {profilePicture ? (
+                <img
+                  src={profilePicture}
+                  alt="Profile"
+                  style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${BRAND_ORANGE}` }}
+                />
+              ) : (
+                <div style={{
+                  width: 90, height: 90, borderRadius: '50%',
+                  background: BRAND_BLUE,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 26, fontWeight: 800, color: '#fff',
+                  border: `3px solid ${BRAND_ORANGE}`,
+                  boxShadow: '0 4px 16px rgba(9,34,64,0.25)',
+                }}>{initials}</div>
+              )}
+              <button
+                onClick={() => fileRef.current?.click()}
+                title="Change photo"
+                style={{
+                  position: 'absolute', bottom: 2, right: 2,
+                  width: 26, height: 26, borderRadius: '50%',
+                  background: BRAND_ORANGE, border: '2px solid #fff',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 2px 6px rgba(231,89,37,0.4)',
+                }}
+              >
+                <Camera size={12} color="#fff" />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePictureChange} />
             </div>
 
-            {/* RIGHT SIDE - Settings */}
-            <div className="lg:col-span-2">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Settings</h3>
-
-              <div className="space-y-6">
-                {/* Home Location Setting */}
-                <div className="border-b border-gray-200 pb-6">
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Home Location
-                  </label>
-                  <p className="text-sm text-gray-600 mb-4">
-                    Choose your default facility view. This will be your default dashboard view when you log in.
-                  </p>
-                  <select 
-                    value={homeLocation}
-                    onChange={(e) => setHomeLocation(e.target.value)}
-                    className="w-full lg:w-96 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
-                  >
-                    <option value="all">All Facilities</option>
-                    <option value="facility1">Memorial Hospital</option>
-                    <option value="facility2">Regional Medical Center</option>
-                    <option value="facility3">Community Hospital</option>
-                    <option value="facility4">University Medical Center</option>
-                    <option value="facility5">General Hospital</option>
-                  </select>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Current selection: <span className="font-medium">{getLocationText()}</span>
-                  </p>
-                </div>
-
-                {/* Notification Settings */}
-                <div className="border-b border-gray-200 pb-6">
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Notification Preferences
-                  </label>
-                  <div className="space-y-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="ml-3 text-sm text-gray-700">Email notifications</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="ml-3 text-sm text-gray-700">Push notifications</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="ml-3 text-sm text-gray-700">SMS alerts</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Dashboard Preferences */}
-                <div className="border-b border-gray-200 pb-6">
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Dashboard Preferences
-                  </label>
-                  <div className="space-y-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="ml-3 text-sm text-gray-700">Show occupancy trends by default</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" defaultChecked className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="ml-3 text-sm text-gray-700">Show capacity forecasts</span>
-                    </label>
-                    <label className="flex items-center">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                      <span className="ml-3 text-sm text-gray-700">Auto-refresh data every 5 minutes</span>
-                    </label>
-                  </div>
-                </div>
-
-                {/* Theme Settings */}
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Theme
-                  </label>
-                  <div className="flex gap-3">
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition">
-                      Light
-                    </button>
-                    <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">
-                      Dark
-                    </button>
-                    <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">
-                      System
-                    </button>
-                  </div>
-                </div>
+            {isEditing ? (
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 2 }}>First Name</div>
+                <input value={firstName} onChange={e => setFirstName(e.target.value)} style={inputStyle} />
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginTop: 4, marginBottom: 2 }}>Last Name</div>
+                <input value={lastName} onChange={e => setLastName(e.target.value)} style={inputStyle} />
               </div>
-
-              {/* Save/Cancel Buttons */}
-              <div className="mt-8 pt-6 border-t border-gray-200 flex gap-3">
-                <button 
-                  onClick={handleSave}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-sm"
-                >
-                  Save Changes
-                </button>
-                <button 
-                  onClick={handleCancel}
-                  className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
-                >
-                  Cancel
-                </button>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{firstName} {lastName}</div>
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>{role}</div>
+                {email && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{email}</div>}
               </div>
+            )}
 
-              {/* Logout Button */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <button
-                  onClick={async () => {
-                    const userStr = sessionStorage.getItem('user');
-                    let userId = null;
-                    let userName = 'Unknown';
-                    
-                    if (userStr) {
-                      const user = JSON.parse(userStr);
-                      userId = user.id;
-                      userName = `${user.firstName} ${user.lastName}`;
-                    }
-                    
-                    try {
-                      // Call logout API
-                      await fetch('/api/auth/logout', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ userId, userName })
-                      });
-                    } catch (error) {
-                      console.error('Logout API error:', error);
-                      // Continue with logout even if API call fails
-                    }
-                    
-                    // Clear session storage and redirect to login
-                    sessionStorage.clear();
-                    window.location.href = '/login.html';
-                  }}
-                  className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition shadow-sm flex items-center justify-center gap-2"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                  Logout
-                </button>
+            <button
+              onClick={() => setIsEditing(e => !e)}
+              style={{
+                width: '100%', padding: '8px 0',
+                background: isEditing ? '#f1f5f9' : BRAND_BLUE,
+                color: isEditing ? '#374151' : '#fff',
+                border: 'none', borderRadius: 7, cursor: 'pointer',
+                fontSize: 12, fontWeight: 600,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              <Edit2 size={12} />
+              {isEditing ? 'Cancel Edit' : 'Edit Name'}
+            </button>
+
+            {/* Role badge */}
+            <div style={{
+              width: '100%', padding: '10px 12px',
+              background: '#f8fafc', borderRadius: 8, border: '1px solid #edf0f5',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Role</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: BRAND_BLUE }}>{role || '—'}</div>
+            </div>
+
+            {/* Home hospital badge */}
+            <div style={{
+              width: '100%', padding: '10px 12px',
+              background: '#fff8f5', borderRadius: 8, border: '1px solid rgba(231,89,37,0.2)',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Home Hospital</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: BRAND_ORANGE, lineHeight: 1.3 }}>{homeName}</div>
+            </div>
+
+            {/* Logout Button */}
+            <div style={{ width: '100%', marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+              <button
+                onClick={handleLogout}
+                style={{
+                  width: '100%', padding: '8px 0',
+                  background: '#dc2626', color: '#fff',
+                  border: 'none', borderRadius: 7, cursor: 'pointer',
+                  fontSize: 12, fontWeight: 600,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  transition: 'background 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#b91c1c'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#dc2626'; }}
+              >
+                <LogOut size={12} />
+                Logout
+              </button>
+            </div>
+          </div>
+
+          {/* RIGHT — Settings */}
+          <div style={{ padding: '28px 28px 24px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 20, letterSpacing: -0.2 }}>Settings</div>
+
+            {/* Home Hospital */}
+            <Section label="Home Hospital" description="Your default facility shown on the dashboard when you log in.">
+              <select
+                value={homeLocation}
+                onChange={e => setHomeLocation(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="all">All Facilities</option>
+                {facilities.map(f => (
+                  <option key={f.id} value={String(f.id)}>{f.name}</option>
+                ))}
+              </select>
+            </Section>
+
+            {/* Notifications */}
+            <Section label="Notification Preferences" description="Choose how you receive alerts and updates.">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <Toggle label="Email notifications" checked={notifications.email} onChange={v => setNotifications(n => ({ ...n, email: v }))} />
+                <Toggle label="Push notifications"  checked={notifications.push}  onChange={v => setNotifications(n => ({ ...n, push: v }))} />
+                <Toggle label="SMS alerts"          checked={notifications.sms}   onChange={v => setNotifications(n => ({ ...n, sms: v }))} />
               </div>
+            </Section>
+
+            {/* Save / Cancel */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 28, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '9px 22px',
+                  background: BRAND_ORANGE, color: '#fff',
+                  border: 'none', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  boxShadow: '0 2px 10px rgba(231,89,37,0.35)',
+                }}
+              >
+                <Save size={14} />
+                Save Changes
+              </button>
+              <button
+                onClick={handleCancel}
+                style={{
+                  padding: '9px 22px',
+                  background: '#f1f5f9', color: '#374151',
+                  border: 'none', borderRadius: 8, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -374,3 +361,58 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   );
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function Section({ label, description, children }: {
+  label: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 24, paddingBottom: 24, borderBottom: '1px solid #f1f5f9' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a', marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 11.5, color: '#94a3b8', marginBottom: 12 }}>{description}</div>
+      {children}
+    </div>
+  );
+}
+
+function Toggle({ label, checked, onChange }: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+      <div
+        onClick={() => onChange(!checked)}
+        style={{
+          width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+          background: checked ? BRAND_BLUE : '#e2e8f0',
+          position: 'relative', transition: 'background 0.2s',
+        }}
+      >
+        <div style={{
+          position: 'absolute', top: 3,
+          left: checked ? 19 : 3,
+          width: 14, height: 14, borderRadius: '50%',
+          background: '#fff', transition: 'left 0.2s',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        }} />
+      </div>
+      <span style={{ fontSize: 12.5, color: '#374151' }}>{label}</span>
+    </label>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: '7px 10px', borderRadius: 7, fontSize: 12.5,
+  border: '1px solid #e2e8f0', outline: 'none', width: '100%', color: '#0f172a',
+};
+
+const selectStyle: React.CSSProperties = {
+  padding: '8px 12px', borderRadius: 7, fontSize: 12.5,
+  border: '1px solid #e2e8f0', outline: 'none',
+  width: '100%', maxWidth: 340,
+  background: '#fff', color: '#0f172a', cursor: 'pointer',
+};

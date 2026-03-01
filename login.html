@@ -136,7 +136,11 @@
                 },
                 body: JSON.stringify({ email, password })
             })
-            .then(response => {
+            .then(async response => {
+                if (response.status === 401) {
+                    showLoginError();
+                    return null;
+                }
                 if (!response.ok) {
                     // Try to parse error response
                     return response.json().then(data => {
@@ -148,6 +152,10 @@
                 return response.json();
             })
             .then(data => {
+                if (!data) {
+                    // 401 response - already handled
+                    return;
+                }
                 if (data.user && data.canAccessAdmin) {
                     // Kevin logged in - redirect to admin page
                     // Store user info in sessionStorage

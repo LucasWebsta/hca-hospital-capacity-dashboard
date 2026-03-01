@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
-import { ChevronDown, Search, Bell } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { ChevronDown, Bell, LogOut, User } from 'lucide-react';
+import { api } from '../api';
+import type { FacilityListItem } from '../api';
 import { ProfileModal } from './ProfileModal';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
@@ -14,20 +16,103 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-export function Header() {
-  const [userInitials, setUserInitials] = useState('ST');
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+function getSessionUser(): { firstName: string; lastName: string; role: string; photoUrl?: string } | null {
+  try {
+    const raw = sessionStorage.getItem('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function getInitials(user: { firstName: string; lastName: string } | null): string {
+  if (!user) return 'HCA';
+  return `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
+}
+
+interface HeaderProps {
+  trendDays?: number;
+  onTrendDaysChange?: (days: number) => void;
+  onAlertsClick?: () => void;
+  onFacilityChange?: (facilityId: number | null, name: string) => void;
+  selectedFacilityName?: string;
+}
+
+function Dropdown({ label, options, onSelect }: {
+  label: string;
+  options: string[];
+  onSelect: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(label);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const userStr = sessionStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '');
-      if (initials) {
-        setUserInitials(initials.toUpperCase());
+    setSelected(label);
+  }, [label]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button style={pill} onClick={() => setOpen(o => !o)}>
+        {selected} <ChevronDown size={13} color="#9ca3af" />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 999,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: 170, padding: '4px 0',
+        }}>
+          {options.map(opt => (
+            <button key={opt} onClick={() => { setSelected(opt); onSelect(opt); setOpen(false); }} style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              padding: '7px 14px', fontSize: 12.5, fontWeight: selected === opt ? 600 : 400,
+              color: selected === opt ? BRAND_BLUE : '#374151',
+              background: selected === opt ? '#f0f5ff' : 'transparent',
+              border: 'none', cursor: 'pointer',
+            }}>{opt}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityName }: HeaderProps) {
+  const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const sessionUser = getSessionUser();
+  const initials = getInitials(sessionUser);
+  const facilityLabel = selectedFacilityName ?? 'All Facilities';
+
+  useEffect(() => {
+    if (onFacilityChange) {
+      api.getFacilitiesList().then(list => {
+        setFacilities(list);
+        const homeId = localStorage.getItem('homeLocation');
+        if (homeId && homeId !== 'all') {
+          const match = list.find(f => String(f.id) === homeId);
+          if (match) onFacilityChange(match.id, match.name);
+        }
+      }).catch(() => {});
+    }
+  }, [onFacilityChange]);
+
+  function handleFacilitySelect(name: string) {
+    if (onFacilityChange) {
+      if (name === 'All Facilities') {
+        onFacilityChange(null, 'All Facilities');
+      } else {
+        const match = facilities.find(f => f.name === name);
+        if (match) onFacilityChange(match.id, match.name);
       }
     }
-  }, []);
+  }
 
   return (
     <div style={{
@@ -41,15 +126,32 @@ export function Header() {
     }}>
       {/* Left filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button style={pill}>Dashboard <ChevronDown size={13} color="#9ca3af" /></button>
-        <button style={pill}>All Hospitals <ChevronDown size={13} color="#9ca3af" /></button>
-        <button style={pill}>All Service Lines <ChevronDown size={13} color="#9ca3af" /></button>
+        {onFacilityChange ? (
+          <Dropdown
+            label={facilityLabel}
+            options={['All Facilities', ...facilities.map(f => f.name)]}
+            onSelect={handleFacilitySelect}
+          />
+        ) : (
+          <>
+            <button style={pill}>Dashboard <ChevronDown size={13} color="#9ca3af" /></button>
+            <button style={pill}>All Hospitals <ChevronDown size={13} color="#9ca3af" /></button>
+            <button style={pill}>All Service Lines <ChevronDown size={13} color="#9ca3af" /></button>
+          </>
+        )}
       </div>
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button style={pill}>Last 14 days <ChevronDown size={13} color="#9ca3af" /></button>
-        <button style={pill}>Next 7 days <ChevronDown size={13} color="#9ca3af" /></button>
+        {onTrendDaysChange && trendDays !== undefined && (
+          <button style={pill}>Last {trendDays} days <ChevronDown size={13} color="#9ca3af" /></button>
+        )}
+        {!onTrendDaysChange && (
+          <>
+            <button style={pill}>Last 14 days <ChevronDown size={13} color="#9ca3af" /></button>
+            <button style={pill}>Next 7 days <ChevronDown size={13} color="#9ca3af" /></button>
+          </>
+        )}
 
         <button style={{
           ...pill,
@@ -58,7 +160,7 @@ export function Header() {
           fontWeight: 600, gap: 6,
           boxShadow: `0 2px 8px rgba(9,34,64,0.3)`,
         }}>
-          <Search size={13} color="#fff" /> Filter <ChevronDown size={13} color="rgba(255,255,255,0.7)" />
+          <ChevronDown size={13} color="rgba(255,255,255,0.7)" /> Filter
         </button>
 
         {/* Bell */}
@@ -91,13 +193,14 @@ export function Header() {
             e.currentTarget.style.boxShadow = `0 1px 6px rgba(231,89,37,0.4)`;
           }}
           title="View Profile"
-        >{userInitials}</div>
+        >{initials}</div>
       </div>
 
       {/* Profile Modal */}
       <ProfileModal 
         isOpen={isProfileModalOpen} 
-        onClose={() => setIsProfileModalOpen(false)} 
+        onClose={() => setIsProfileModalOpen(false)}
+        onFacilityChange={onFacilityChange}
       />
     </div>
   );

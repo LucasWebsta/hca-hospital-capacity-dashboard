@@ -4,6 +4,18 @@
 
 const BASE = import.meta.env.VITE_API_BASE ?? '/api';
 
+/** Current user id from session (set by login page). Used for user-scoped alert rules. */
+function getCurrentUserId(): number | null {
+  try {
+    const raw = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('user') : null;
+    if (!raw) return null;
+    const user = JSON.parse(raw) as { id?: number };
+    return user?.id != null ? user.id : null;
+  } catch {
+    return null;
+  }
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
@@ -85,6 +97,33 @@ export interface CreateAlertRulePayload {
   window_minutes?: number;
 }
 
+/** Report configuration (facility, days, sections to include) */
+export interface ReportConfig {
+  facilityId: number | null;
+  facilityName: string;
+  trendDays: number;
+  sections: ('overview' | 'trend' | 'forecast' | 'facilities' | 'alerts')[];
+}
+
+/** Snapshot data: census, trend, forecast, facilities, alerts */
+export interface ReportSnapshotData {
+  census: CensusMetrics | null;
+  trend: TrendPoint[];
+  forecast: ForecastResponse | null;
+  facilities: Facility[];
+  alerts: Alert[];
+  capturedAt: string; // ISO
+}
+
+/** Saved report snapshot from API */
+export interface ReportSnapshot {
+  id: string;
+  title?: string | null;
+  config: ReportConfig;
+  data: ReportSnapshotData;
+  created_at: string;
+}
+
 // ─────────────────────────────────────────────
 // API calls
 // ─────────────────────────────────────────────
@@ -93,18 +132,59 @@ export const api = {
   getCensusMetrics: (facilityId?: number) => get<CensusMetrics>(facilityId ? `/census?facility_id=${facilityId}` : '/census'),
   getFacilities:    (facilityId?: number) => get<Facility[]>(facilityId ? `/facilities?facility_id=${facilityId}` : '/facilities'),
   getAlerts:        () => get<Alert[]>('/alerts'),
-  getTrend:         (days = 30, facilityId?: number) => get<TrendPoint[]>(`/trend?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
+  getTrend:         (days = 30, facilityId?: number, series: 'overall' | 'icu' = 'overall') =>
+    get<TrendPoint[]>(`/trend?days=${days}&series=${series}${facilityId ? `&facility_id=${facilityId}` : ''}`),
   getForecast:      (days = 7, facilityId?: number)  => get<ForecastResponse>(`/forecast?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
   getFacilitiesList: () => get<FacilityListItem[]>('/facilitiesList'),
   getMetricTypes:   () => get<string[]>('/metricTypes'),
-  getAlertRules:    () => get<AlertRule[]>('/alertRules'),
-  createAlertRule:  (payload: CreateAlertRulePayload) =>
-    fetch(`${BASE}/alertRulesPost`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).then(async (r) => {
+  getAlertRules:    () => {
+    const uid = getCurrentUserId();
+    const headers: Record<string, string> = {};
+    if (uid != null) headers['X-User-Id'] = String(uid);
+    return fetch(`${BASE}/alertRules`, { headers }).then(async (r) => {
       if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json() as Promise<AlertRule[]>;
+    });
+  },
+  createAlertRule:  (payload: CreateAlertRulePayload) => {
+    const uid = getCurrentUserId();
+    if (uid == null) return Promise.reject(new Error('Login required to create alert rules'));
+    return fetch(`${BASE}/alertRulesPost`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Id': String(uid) },
+      body: JSON.stringify(payload),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
       return r.json() as Promise<AlertRule>;
-    }),
-  deleteAlertRule:  (id: number) =>
-    fetch(`${BASE}/alertRulesDelete?id=${id}`, { method: 'DELETE' }).then((r) => {
+    });
+  },
+  deleteAlertRule:  (id: number) => {
+    const uid = getCurrentUserId();
+    if (uid == null) return Promise.reject(new Error('Login required to delete alert rules'));
+    return fetch(`${BASE}/alertRulesDelete?id=${id}`, {
+      method: 'DELETE',
+      headers: { 'X-User-Id': String(uid) },
+    }).then((r) => {
       if (!r.ok && r.status !== 204) throw new Error(`API error ${r.status}`);
+    });
+  },
+
+  getReportSnapshot:  (id: string) =>
+    fetch(`${BASE}/reportSnapshots/${id}`).then(async (r) => {
+      if (!r.ok) throw new Error(r.status === 404 ? 'Snapshot not found' : `API error ${r.status}`);
+      return r.json() as Promise<ReportSnapshot>;
     }),
+  createReportSnapshot: (payload: { title?: string; config: ReportConfig; data: ReportSnapshotData }) => {
+    const uid = getCurrentUserId();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (uid != null) headers['X-User-Id'] = String(uid);
+    return fetch(`${BASE}/reportSnapshots`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ id: string; created_at: string }>;
+    });
+  },
 };
