@@ -184,6 +184,109 @@ async function handleTrend(res, days = 30) {
   json(res, rows);
 }
 
+// ── /api/auth/login ─────────────────────────────────────────────────────────
+async function handleLogin(req, res) {
+  let body = '';
+  for await (const chunk of req) body += chunk;
+  const { email, password } = JSON.parse(body || '{}');
+
+  if (!email || !password) {
+    return json(res, { error: 'Email and password are required' }, 400);
+  }
+
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name, email, role, photo_url, password_hash
+     FROM users
+     WHERE LOWER(email) = LOWER($1) AND is_active = true`,
+    [email]
+  );
+
+  if (rows.length === 0) {
+    return json(res, { error: 'Invalid email or password' }, 401);
+  }
+
+  const user = rows[0];
+
+  // Plain-text password check (demo — hashes are stored as plaintext)
+  if (user.password_hash !== password) {
+    return json(res, { error: 'Invalid email or password' }, 401);
+  }
+
+  const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role);
+
+  return json(res, {
+    user: {
+      id: user.id,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      email: user.email,
+      role: user.role,
+      photoUrl: user.photo_url,
+    },
+    canAccessAdmin,
+  });
+}
+
+// ── /api/users ───────────────────────────────────────────────────────────────
+async function handleUsers(req, res) {
+  if (req.method === 'POST') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const { firstName, lastName, email, role, homeFacilityId } = JSON.parse(body || '{}');
+    if (!firstName || !lastName || !email || !role) {
+      return json(res, { error: 'firstName, lastName, email, and role are required' }, 400);
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO users (first_name, last_name, email, role, home_facility_id, password_hash, is_active)
+       VALUES ($1, $2, $3, $4, $5, 'Demo1234!', true)
+       RETURNING id, first_name, last_name, email, role, home_facility_id, is_active, created_at`,
+      [firstName, lastName, email, role, homeFacilityId || null]
+    );
+    return json(res, rows[0], 201);
+  }
+  // GET
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name, email, role, home_facility_id, photo_url, is_active, created_at
+     FROM users ORDER BY id`
+  );
+  json(res, rows);
+}
+
+// ── /api/users/:id ───────────────────────────────────────────────────────────
+async function handleUserById(req, res, id) {
+  if (req.method === 'DELETE') {
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    return json(res, { success: true });
+  }
+  json(res, { error: 'Method not allowed' }, 405);
+}
+
+// ── /api/activity ─────────────────────────────────────────────────────────────
+async function handleActivity(req, res, searchParams) {
+  const limit = parseInt(searchParams.get('limit') ?? '50', 10);
+  const action = searchParams.get('action');
+  const params = [limit];
+  let where = '';
+  if (action && action !== 'all') {
+    where = 'WHERE action = $2';
+    params.push(action);
+  }
+  const { rows } = await pool.query(
+    `SELECT id, user_id, user_name, action, timestamp, ip_address, user_agent
+     FROM activity_logs
+     ${where}
+     ORDER BY timestamp DESC
+     LIMIT $1`,
+    params
+  );
+  json(res, rows);
+}
+
+// ── /api/auth/logout ──────────────────────────────────────────────────────────
+function handleLogout(res) {
+  json(res, { success: true });
+}
+
 // ── /api/forecast ─────────────────────────────────────────────────────────────
 async function handleForecast(res, days = 7) {
   const { rows } = await pool.query(`
@@ -205,7 +308,7 @@ async function handleForecast(res, days = 7) {
 // ── Router ────────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET', 'Access-Control-Allow-Headers': 'Content-Type' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type' });
     res.end();
     return;
   }
@@ -214,9 +317,14 @@ const server = http.createServer(async (req, res) => {
   const path = url.pathname.replace(/^\/api/, '');
   const days = parseInt(url.searchParams.get('days') ?? '30', 10);
 
-  console.log(`[${new Date().toLocaleTimeString()}] GET ${url.pathname}`);
+  console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname}`);
 
   try {
+    if (path === '/auth/login' && req.method === 'POST') return await handleLogin(req, res);
+    if (path === '/auth/logout' && req.method === 'POST') return handleLogout(res);
+    if (path === '/users' && (req.method === 'GET' || req.method === 'POST')) return await handleUsers(req, res);
+    if (/^\/users\/\d+$/.test(path)) return await handleUserById(req, res, path.split('/')[2]);
+    if (path === '/activity') return await handleActivity(req, res, url.searchParams);
     if (path === '/census')     return await handleCensus(res);
     if (path === '/facilities') return await handleFacilities(res);
     if (path === '/alerts')     return await handleAlerts(res);
@@ -231,5 +339,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n✅  API server running at http://localhost:${PORT}/api`);
-  console.log('   /census  /facilities  /alerts  /trend?days=N  /forecast?days=N\n');
+  console.log('   /census  /facilities  /alerts  /trend?days=N  /forecast?days=N  POST /auth/login  /users  /activity\n');
 });
