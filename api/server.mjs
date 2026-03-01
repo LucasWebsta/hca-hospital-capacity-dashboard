@@ -13,6 +13,7 @@
 import http from 'http';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from 'crypto';
 
 const { Pool } = pg;
 const pool = new Pool({
@@ -23,6 +24,39 @@ const pool = new Pool({
 });
 
 const PORT = 7071;
+
+// Password hashing using built-in crypto (PBKDF2)
+const SALT_LENGTH = 32;
+const ITERATIONS = 100000;
+const KEY_LENGTH = 64;
+const DIGEST = 'sha512';
+
+function hashPassword(password) {
+  const salt = randomBytes(SALT_LENGTH);
+  const hash = pbkdf2Sync(password, salt, ITERATIONS, KEY_LENGTH, DIGEST);
+  return `${salt.toString('base64')}:${hash.toString('base64')}`;
+}
+
+function comparePassword(plainPassword, storedHash) {
+  // Legacy plain text support
+  if (!storedHash.includes(':')) {
+    return storedHash === plainPassword;
+  }
+
+  const [saltBase64, hashBase64] = storedHash.split(':');
+  if (!saltBase64 || !hashBase64) {
+    return false;
+  }
+
+  try {
+    const salt = Buffer.from(saltBase64, 'base64');
+    const storedHashBuffer = Buffer.from(hashBase64, 'base64');
+    const computedHash = pbkdf2Sync(plainPassword, salt, ITERATIONS, KEY_LENGTH, DIGEST);
+    return timingSafeEqual(storedHashBuffer, computedHash);
+  } catch {
+    return false;
+  }
+}
 
 function json(res, data, status = 200) {
   const body = JSON.stringify(data);
@@ -415,11 +449,18 @@ async function handleLogin(req, res) {
 
   const user = rows[0];
 
-  // Password check: bcrypt if hash starts with $2b$/$2a$, otherwise plain-text fallback for legacy rows
-  const isLegacyPlain = !user.password_hash.startsWith('$2');
-  const passwordMatch = isLegacyPlain
-    ? user.password_hash === password
-    : await bcrypt.compare(password, user.password_hash);
+  // Password check: supports bcrypt ($2a$, $2b$, $2y$), crypto (salt:hash), and plain-text legacy
+  let passwordMatch = false;
+  if (user.password_hash.startsWith('$2a$') || user.password_hash.startsWith('$2b$') || user.password_hash.startsWith('$2y$')) {
+    // bcrypt hash - use bcrypt to compare
+    passwordMatch = await bcrypt.compare(password, user.password_hash);
+  } else if (user.password_hash.includes(':')) {
+    // Crypto PBKDF2 hash (salt:hash format)
+    passwordMatch = comparePassword(password, user.password_hash);
+  } else {
+    // Legacy plain text
+    passwordMatch = user.password_hash === password;
+  }
   if (!passwordMatch) {
     // Log failed login attempt for wrong password
     try {
@@ -498,9 +539,9 @@ async function handleUsers(req, res) {
     if (!firstName || !lastName || !email || !role) {
       return json(res, { error: 'firstName, lastName, email, and role are required' }, 400);
     }
-    // Hash the password before storing (bcrypt, cost factor 10)
+    // Hash the password before storing (using crypto PBKDF2)
     const rawPassword = password || 'Demo1234!';
-    const passwordHash = await bcrypt.hash(rawPassword, 10);
+    const passwordHash = hashPassword(rawPassword);
     const { rows } = await pool.query(
       `INSERT INTO users (first_name, last_name, email, role, home_facility_id, password_hash, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, true)
