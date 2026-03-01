@@ -7,6 +7,7 @@ const BRAND_ORANGE = '#E75925';
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  facilityName?: string;
 }
 
 const navItems = [
@@ -16,7 +17,7 @@ const navItems = [
   { id: 'reports', label: 'Reports', icon: FileText },
 ];
 
-export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, facilityName }: SidebarProps) {
   return (
     <div style={{
       width: 224, minWidth: 224,
@@ -99,7 +100,7 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
           );
         })()}
 
-        {/* Emin Rantsra */}
+        {/* Home Hospital */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8 }}>
           <div style={{
             width: 32, height: 32, borderRadius: '50%',
@@ -109,12 +110,9 @@ export function Sidebar({ activeTab, onTabChange }: SidebarProps) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7a9abd" strokeWidth="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Emin Rantsra</div>
-            <div style={{ fontSize: 10.5, color: '#7a9abd' }}>Hospital</div>
+            <div style={{ fontSize: 12.5, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{facilityName ?? 'All Facilities'}</div>
+            <div style={{ fontSize: 10.5, color: '#7a9abd' }}>Home Hospital</div>
           </div>
-          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#7a9abd', padding: 2 }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-          </button>
         </div>
       </div>
     </div>
