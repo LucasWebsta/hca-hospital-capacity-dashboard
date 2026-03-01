@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL CHECK (role IN ('Administrator', 'Executive Director', 'Manager', 'Analyst', 'Viewer')),
     status TEXT NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Inactive')),
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    -- Default date range for trend/filter (e.g. 7, 14, 30, 60 days). Used when you add date range picker.
+    default_trend_days INTEGER DEFAULT 30 CHECK (default_trend_days IS NULL OR default_trend_days IN (7, 14, 30, 60))
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

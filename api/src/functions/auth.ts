@@ -20,7 +20,7 @@ export async function loginHandler(
 
         const db = getDb();
         const { rows } = await db.query(
-            `SELECT id, first_name, last_name, email, role, photo_url, password_hash
+            `SELECT id, first_name, last_name, email, role, photo_url, phone_number, default_trend_days, password_hash
              FROM users
              WHERE email = $1`,
             [email.toLowerCase()]
@@ -78,6 +78,8 @@ export async function loginHandler(
                     email: user.email,
                     role: user.role,
                     photoUrl: (user as { photo_url?: string }).photo_url ?? null,
+                    phoneNumber: (user as { phone_number?: string }).phone_number ?? null,
+                    defaultTrendDays: (user as { default_trend_days?: number }).default_trend_days ?? 30,
                 },
                 canAccessAdmin,
             },
