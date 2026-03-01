@@ -40,6 +40,9 @@ interface HeaderProps {
   onTrendDaysChange: (days: number) => void;
   onAlertsClick: () => void;
   onFacilityChange: (facilityId: number | null, name: string) => void;
+  /** Current facility selection from parent (keeps dropdown in sync with dashboard/reports). */
+  selectedFacilityId?: number | null;
+  selectedFacilityName?: string;
 }
 
 function Dropdown({ label, options, onSelect }: {
@@ -50,6 +53,10 @@ function Dropdown({ label, options, onSelect }: {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(label);
   const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setSelected(label);
+  }, [label]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -85,18 +92,17 @@ function Dropdown({ label, options, onSelect }: {
   );
 }
 
-export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange }: HeaderProps) {
+export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityId = null, selectedFacilityName }: HeaderProps) {
   const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
-  const [selectedFacilityName, setSelectedFacilityName] = useState('All Facilities');
   const sessionUser = getSessionUser();
   const initials = getInitials(sessionUser);
+  const facilityLabel = selectedFacilityName ?? 'All Facilities';
 
   useEffect(() => {
     api.getFacilitiesList().then(setFacilities).catch(() => {});
   }, []);
 
   function handleFacilitySelect(name: string) {
-    setSelectedFacilityName(name);
     if (name === 'All Facilities') {
       onFacilityChange(null, 'All Facilities');
     } else {
@@ -118,7 +124,7 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
       {/* Left filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <Dropdown
-          label={selectedFacilityName}
+          label={facilityLabel}
           options={['All Facilities', ...facilities.map(f => f.name)]}
           onSelect={handleFacilitySelect}
         />

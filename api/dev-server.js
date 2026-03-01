@@ -91,7 +91,7 @@ const server = http.createServer(async (req, res) => {
             [user.id, `${user.first_name} ${user.last_name}`, req.headers['x-forwarded-for'] || 'unknown', req.headers['user-agent'] || 'unknown']
           );
         } catch (_) { /* table may not exist or different schema */ }
-        const canAccessAdmin = (user.first_name || '').toLowerCase() === 'kevin';
+        const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role || '');
         return send(res, 200, {
           user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role },
           canAccessAdmin,
@@ -169,16 +169,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, { message: 'User deleted successfully' });
     }
 
-    // GET /api/census (facilities + facility_metrics; total from 'total'/'census'/etc. + ICU)
+    // GET /api/census (optional ?facility_id= for single facility)
     if (base === 'census' && method === 'GET') {
-      const { rows } = await db.query(`
-        WITH census_metrics AS (
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const { rows } = await db.query(
+        `WITH census_metrics AS (
           SELECT facility_id, source_update_date, metric_value,
                  ROW_NUMBER() OVER (PARTITION BY facility_id ORDER BY source_update_date DESC,
                    CASE WHEN LOWER(metric) = 'total census' THEN 0 WHEN LOWER(metric) = 'total' THEN 1 WHEN LOWER(metric) = 'census' THEN 2 ELSE 3 END
                  ) AS rn
           FROM facility_metrics
           WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+            AND ($1::int IS NULL OR facility_id = $1)
         ),
         latest_vals AS (
           SELECT facility_id, metric_value FROM census_metrics WHERE rn = 1
@@ -186,9 +188,10 @@ const server = http.createServer(async (req, res) => {
         totals AS (
           SELECT COALESCE(SUM(lv.metric_value), 0)::int AS total_census, COALESCE(SUM(f.capacity), 0)::int AS total_capacity
           FROM facilities f LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
+          WHERE ($1::int IS NULL OR f.facility_id = $1)
         ),
         latest_icu AS (
-          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) = 'icu' GROUP BY facility_id
+          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) = 'icu' AND ($1::int IS NULL OR facility_id = $1) GROUP BY facility_id
         ),
         icu_vals AS (
           SELECT fm.facility_id, fm.metric_value FROM facility_metrics fm
@@ -199,7 +202,8 @@ const server = http.createServer(async (req, res) => {
           SELECT ROUND(AVG(daily_total))::int AS avg_census FROM (
             SELECT SUM(metric_value)::int AS daily_total FROM facility_metrics
             WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-              AND (source_update_date AT TIME ZONE 'UTC')::date >= (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')) - INTERVAL '7 days'
+              AND ($1::int IS NULL OR facility_id = $1)
+              AND (source_update_date AT TIME ZONE 'UTC')::date >= (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '7 days'
             GROUP BY (source_update_date AT TIME ZONE 'UTC')::date
           ) d
         )
@@ -207,16 +211,18 @@ const server = http.createServer(async (req, res) => {
                ROUND((t.total_census::numeric / NULLIF(t.total_capacity, 0)) * 100, 1) AS "occupancyRate",
                (SELECT COALESCE(ROUND(avg_census * 1.015)::int, t.total_census) FROM recent_avg) AS "sevenDayForecast",
                (SELECT total FROM icu_total) AS "icuTotal"
-        FROM totals t
-      `);
+        FROM totals t`,
+        [facilityId]
+      );
       return send(res, 200, rows[0]);
     }
 
-    // GET /api/facilities (facilities + facility_metrics)
+    // GET /api/facilities (optional ?facility_id= for single facility)
     if (base === 'facilities' && method === 'GET') {
-      const { rows } = await db.query(`
-        WITH latest_per_facility AS (
-          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') GROUP BY facility_id
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const { rows } = await db.query(
+        `WITH latest_per_facility AS (
+          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1) GROUP BY facility_id
         ),
         latest_vals AS (
           SELECT fm.facility_id, fm.metric_value FROM facility_metrics fm
@@ -224,7 +230,7 @@ const server = http.createServer(async (req, res) => {
         ),
         ranked AS (
           SELECT facility_id, metric_value, ROW_NUMBER() OVER (PARTITION BY facility_id ORDER BY source_update_date DESC) AS rn
-          FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
+          FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)
         ),
         prev_vals AS (SELECT facility_id, metric_value AS prev_val FROM ranked WHERE rn = 2)
         SELECT f.name, COALESCE(lv.metric_value, 0)::int AS census,
@@ -234,8 +240,10 @@ const server = http.createServer(async (req, res) => {
                     WHEN COALESCE(lv.metric_value, 0) < COALESCE(pv.prev_val, lv.metric_value, 0) THEN 'down' ELSE 'flat' END AS trend
         FROM facilities f LEFT JOIN latest_vals lv ON f.facility_id = lv.facility_id
         LEFT JOIN prev_vals pv ON f.facility_id = pv.facility_id
-        ORDER BY occupancy DESC NULLS LAST LIMIT 5
-      `);
+        WHERE ($1::int IS NULL OR f.facility_id = $1)
+        ORDER BY occupancy DESC NULLS LAST LIMIT 5`,
+        [facilityId]
+      );
       return send(res, 200, rows);
     }
 
@@ -279,16 +287,18 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, rows);
     }
 
-    // GET /api/trend (facility_metrics by date)
+    // GET /api/trend (optional ?facility_id= for single facility)
     if (base === 'trend' && method === 'GET') {
       const days = parseInt(query.get('days') || '30', 10);
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
       const actuals = await db.query(
         `SELECT TO_CHAR((source_update_date AT TIME ZONE 'UTC')::date, 'Mon DD') AS date, SUM(metric_value)::int AS actual
          FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
+         AND ($2::int IS NULL OR facility_id = $2)
          AND (source_update_date AT TIME ZONE 'UTC')::date >=
-             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - ($1 || ' days')::INTERVAL
+             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($2::int IS NULL OR facility_id = $2)) - ($1 || ' days')::INTERVAL
          GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY (source_update_date AT TIME ZONE 'UTC')::date ASC`,
-        [days]
+        [days, facilityId]
       );
       const historicalRows = actuals.rows || [];
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -312,16 +322,19 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, historicalRows);
     }
 
-    // GET /api/forecast (facility_metrics)
+    // GET /api/forecast (optional ?facility_id= for single facility)
     if (base === 'forecast' && method === 'GET') {
       const days = parseInt(query.get('days') || '7', 10);
-      const { rows: recent } = await db.query(`
-        SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
+      const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const { rows: recent } = await db.query(
+        `SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
         FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
+        AND ($1::int IS NULL OR facility_id = $1)
         AND (source_update_date AT TIME ZONE 'UTC')::date >=
-            (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')) - INTERVAL '14 days'
-        GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY census_date ASC
-      `);
+            (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '14 days'
+        GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY census_date ASC`,
+        [facilityId]
+      );
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const forecastRows = [];
       if (recent && recent.length >= 2) {
