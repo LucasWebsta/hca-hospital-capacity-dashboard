@@ -56,14 +56,47 @@ export interface TrendPoint {
   date: string;
   actual?: number;
   forecast?: number;
+  predicted?: number;
   lower?: number;
   upper?: number;
+  lower80?: number;
+  upper80?: number;
+  lower95?: number;
+  upper95?: number;
   occupancy_pct?: number;
+}
+
+export interface PredictionDrivers {
+  trend: { direction: string; strength: number; description: string };
+  seasonality: { detected: boolean; pattern: string };
+  recentVolatility: number;
+  historicalAverage: number;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface CrossValidationMetrics {
+  kFolds: number;
+  cvMae: number;
+  cvRmse: number;
+  cvMape: number;
+  cvAccuracy: number;
+}
+
+export interface ModelMetrics {
+  mae: number;
+  rmse: number;
+  mape: number;
+  accuracy: number;
+  trainSize: number;
+  testSize: number;
+  validationMethod: string;
+  crossValidation?: CrossValidationMetrics;
 }
 
 export interface ForecastResponse {
   data: TrendPoint[];
-  stats: { mae: number; rmse: number; accuracy: number; upliftPct: number };
+  stats: ModelMetrics;
+  drivers?: PredictionDrivers;
 }
 
 /** For alerts page: facility dropdown (hospitals table) */

@@ -35,12 +35,26 @@ export async function loadFacilities(): Promise<Facility[]> {
 }
 
 export async function loadMetrics(facilityId: number): Promise<MetricRow[]> {
-    const res = await fetch(`/api/rawMetrics?facilityId=${facilityId}`);
-    const data = await res.json();
-    return data.map((r: any) => ({
-        metric: r.metric,
-        orgId: Number(r.facility_id),
-        timestamp: new Date(r.source_update_date),
-        value: Number(r.metric_value),
-    }));
+    try {
+        const res = await fetch(`/api/rawMetrics?facilityId=${facilityId}`);
+        if (!res.ok) {
+            console.error(`Failed to load metrics: ${res.status} ${res.statusText}`);
+            return [];
+        }
+        const data = await res.json();
+        // Handle both array and object responses
+        if (!Array.isArray(data)) {
+            console.error('Expected array but got:', typeof data);
+            return [];
+        }
+        return data.map((r: any) => ({
+            metric: r.metric || 'Unknown',
+            orgId: Number(r.facility_id || facilityId),
+            timestamp: new Date(r.source_update_date || r.update_utc || new Date()),
+            value: Number(r.metric_value || 0),
+        }));
+    } catch (err) {
+        console.error('Error loading metrics:', err);
+        return [];
+    }
 }
