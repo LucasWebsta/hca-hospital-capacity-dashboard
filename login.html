@@ -123,12 +123,13 @@
                 return;
             }
             
-            // Here you would typically send this to your backend
-            // For demo purposes, simulate login validation
-            // Replace this with actual API call
+            // Get API base URL
+            const API_BASE = window.location.protocol === 'file:' 
+                ? 'http://localhost:7071/api'
+                : '/api';
             
-            // Simulate API call
-            fetch('/api/auth/login', {
+            // Call login API
+            fetch(`${API_BASE}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -136,17 +137,40 @@
                 body: JSON.stringify({ email, password })
             })
             .then(response => {
-                if (response.ok) {
-                    // Successful login
-                    window.location.href = '/dashboard';
+                if (!response.ok) {
+                    // Try to parse error response
+                    return response.json().then(data => {
+                        throw new Error(data.error || `HTTP ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.user && data.canAccessAdmin) {
+                    // Kevin logged in - redirect to admin page
+                    // Store user info in sessionStorage
+                    sessionStorage.setItem('user', JSON.stringify(data.user));
+                    sessionStorage.setItem('isAdmin', 'true');
+                    window.location.href = 'admin.html';
+                } else if (data.user) {
+                    // Other users logged in - redirect to React app (App.tsx via Vite dev server)
+                    // Store user info in sessionStorage
+                    sessionStorage.setItem('user', JSON.stringify(data.user));
+                    sessionStorage.setItem('isAdmin', 'false');
+                    // Redirect to Vite dev server which serves the React app (App.tsx)
+                    window.location.href = 'http://localhost:5175/';
                 } else {
                     // Incorrect credentials - show error on both fields
                     showLoginError();
                 }
             })
             .catch(error => {
-                // Network error or API not available - for demo, show error
+                // Network error or API not available - show error
                 console.error('Login error:', error);
+                console.error('API_BASE:', API_BASE);
+                alert('Cannot connect to server. Please ensure the API server is running at http://localhost:7071\n\nError: ' + error.message);
                 showLoginError();
             });
         });

@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: 5175,
     proxy: {
       // In local dev, forward /api/* to the Azure Functions emulator (port 7071)
       '/api': {
