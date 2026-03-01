@@ -80,7 +80,6 @@ function App() {
             setSelectedFacilityId(id);
             setSelectedFacilityName(name);
           }}
-          selectedFacilityId={selectedFacilityId}
           selectedFacilityName={selectedFacilityName}
         />
 
