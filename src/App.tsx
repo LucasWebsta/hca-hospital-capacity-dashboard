@@ -251,32 +251,8 @@ function App() {
         {activeTab === "forecast" && <ForecastPage />}
 
         {activeTab === "alerts" && (
-          <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  letterSpacing: -0.3,
-                }}
-              >
-                Alerts & Notifications
-              </div>
-              <div
-                style={{
-                  fontSize: 12.5,
-                  color: "#94a3b8",
-                  marginTop: 3,
-                  fontWeight: 500,
-                }}
-              >
-                Create and manage your alert rules
-              </div>
-            </div>
-            <div style={{ width: "100%" }}>
-              <AlertsPanel />
-            </div>
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <AlertsPanel />
           </div>
         )}
 

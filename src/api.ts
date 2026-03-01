@@ -131,7 +131,15 @@ export interface ReportSnapshot {
 export const api = {
   getCensusMetrics: (facilityId?: number) => get<CensusMetrics>(facilityId ? `/census?facility_id=${facilityId}` : '/census'),
   getFacilities:    (facilityId?: number) => get<Facility[]>(facilityId ? `/facilities?facility_id=${facilityId}` : '/facilities'),
-  getAlerts:        () => get<Alert[]>('/alerts'),
+  getAlerts: () => {
+    const uid = getCurrentUserId();
+    const headers: Record<string, string> = {};
+    if (uid != null) headers['X-User-Id'] = String(uid);
+    return fetch(`${BASE}/alerts`, { headers }).then(async (r) => {
+      if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json() as Promise<Alert[]>;
+    });
+  },
   getTrend:         (days = 30, facilityId?: number, series: 'overall' | 'icu' = 'overall') =>
     get<TrendPoint[]>(`/trend?days=${days}&series=${series}${facilityId ? `&facility_id=${facilityId}` : ''}`),
   getForecast:      (days = 7, facilityId?: number)  => get<ForecastResponse>(`/forecast?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
