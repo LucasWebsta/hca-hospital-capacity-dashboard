@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Bell, LogOut, User } from 'lucide-react';
 import { api } from '../api';
 import type { FacilityListItem } from '../api';
+import { ProfileModal } from './ProfileModal';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -165,6 +166,7 @@ function AvatarMenu({ initials, sessionUser }: {
   sessionUser: { firstName: string; lastName: string; role: string } | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -211,7 +213,7 @@ function AvatarMenu({ initials, sessionUser }: {
 
           {/* Profile */}
           <button
-            onClick={() => setOpen(false)}
+            onClick={() => { setOpen(false); setProfileOpen(true); }}
             style={{
               display: 'flex', alignItems: 'center', gap: 10,
               width: '100%', padding: '9px 16px',
@@ -238,6 +240,8 @@ function AvatarMenu({ initials, sessionUser }: {
           </button>
         </div>
       )}
+
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
     </div>
   );
 }
