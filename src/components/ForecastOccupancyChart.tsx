@@ -126,7 +126,8 @@ export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { faci
     <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #edf0f5', padding: '20px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)' }}>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+        {/* Title row */}
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Forecast Occupancy</span>
@@ -134,9 +135,9 @@ export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { faci
               <InfoTooltip text="Linear regression model with 80% and 95% confidence intervals. Validated using 80/20 train/test split and 5-fold cross-validation. MAE, RMSE, and MAPE show prediction accuracy. Cross-validation metrics provide additional robustness assessment." />
             )}
           </div>
-          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span>Linear Regression Model · CI 80% & 95% · {stats.validationMethod || 'train_test_split_80_20'}</span>
-            {stats.crossValidation && <span>· {stats.crossValidation.kFolds}-fold CV</span>}
+          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+            <span>Linear Regression · CI 80% & 95% · {(stats.validationMethod || 'train_test_split_80_20').replace('train_test_split_', '').replace('_', '/')} split</span>
+            {(stats as any).crossValidation && <span>· {(stats as any).crossValidation.kFolds}-fold CV</span>}
             {tooltipsOn && (
               <InfoTooltip 
                 text="Model Details: This forecast uses a linear regression model that finds trends in historical data. The model was validated by training on 80% of data and testing on 20%, plus 5-fold cross-validation for extra reliability. Confidence intervals show the range of likely outcomes." 
@@ -146,26 +147,23 @@ export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { faci
             )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Time Window Selector */}
-          <div style={{ display: 'flex', gap: 3, background: '#f8fafc', borderRadius: 7, padding: 3, border: '1px solid #edf0f5' }}>
-            {([
-              { id: 'past-week', label: 'Past Week' },
-              { id: 'current-week', label: 'Current Week' },
-              { id: 'next-week', label: 'Next Week' },
-              { id: 'next-month', label: 'Next Month' }
-            ] as { id: TimeWindow; label: string }[]).map(w => (
-              <button key={w.id} onClick={() => setTimeWindow(w.id)} style={{
-                fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 5,
-                border: 'none', cursor: 'pointer',
-                background: timeWindow === w.id ? BRAND_BLUE : 'transparent',
-                color: timeWindow === w.id ? '#fff' : '#94a3b8',
-                boxShadow: timeWindow === w.id ? `0 1px 4px rgba(9,34,64,0.25)` : 'none',
-                whiteSpace: 'nowrap'
-              }}>{w.label}</button>
-            ))}
-          </div>
-          
+        {/* Tab row — full width so tabs never overflow */}
+        <div style={{ display: 'flex', gap: 3, background: '#f8fafc', borderRadius: 7, padding: 3, border: '1px solid #edf0f5' }}>
+          {([
+            { id: 'past-week', label: 'Past Wk' },
+            { id: 'current-week', label: 'This Wk' },
+            { id: 'next-week', label: 'Next Wk' },
+            { id: 'next-month', label: 'Next Mo' }
+          ] as { id: TimeWindow; label: string }[]).map(w => (
+            <button key={w.id} onClick={() => setTimeWindow(w.id)} style={{
+              flex: 1, fontSize: 11, fontWeight: 600, padding: '4px 6px', borderRadius: 5,
+              border: 'none', cursor: 'pointer',
+              background: timeWindow === w.id ? BRAND_BLUE : 'transparent',
+              color: timeWindow === w.id ? '#fff' : '#94a3b8',
+              boxShadow: timeWindow === w.id ? `0 1px 4px rgba(9,34,64,0.25)` : 'none',
+              whiteSpace: 'nowrap'
+            }}>{w.label}</button>
+          ))}
         </div>
       </div>
 
@@ -202,7 +200,7 @@ export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { faci
         {(stats.trainSize ?? 0) > 0 && (
           <div style={{ background: '#f0f9ff', borderRadius: 7, padding: '5px 10px', border: `1px solid rgba(9,34,64,0.1)`, fontSize: 10, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span>Train: {stats.trainSize} | Test: {stats.testSize}</span>
-            {stats.crossValidation && <span>| CV: {stats.crossValidation.kFolds}-fold</span>}
+            {(stats as any).crossValidation && <span>| CV: {(stats as any).crossValidation.kFolds}-fold</span>}
             {tooltipsOn && (
               <InfoTooltip 
                 text="Data Split: The model was trained on the 'Train' portion of historical data and tested on the 'Test' portion to measure accuracy. Cross-validation (CV) further validates the model by testing it on different subsets of data." 
@@ -212,10 +210,10 @@ export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { faci
             )}
           </div>
         )}
-        {stats.crossValidation && (
+        {(stats as any).crossValidation && (
           <div style={{ background: '#fefce8', borderRadius: 7, padding: '5px 10px', border: `1px solid rgba(234,179,8,0.2)`, fontSize: 10, color: '#64748b', display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontWeight: 600, color: '#ca8a04' }}>Cross-Validation:</span> 
-            <span>MAE {stats.crossValidation.cvMae.toFixed(1)} | RMSE {stats.crossValidation.cvRmse.toFixed(1)} | Accuracy {stats.crossValidation.cvAccuracy.toFixed(1)}%</span>
+            <span>MAE {(stats as any).crossValidation.cvMae.toFixed(1)} | RMSE {(stats as any).crossValidation.cvRmse.toFixed(1)} | Accuracy {(stats as any).crossValidation.cvAccuracy.toFixed(1)}%</span>
             {tooltipsOn && (
               <InfoTooltip 
                 text="Cross-Validation Metrics: These metrics come from testing the model on 5 different subsets of data. This provides a more robust assessment of model performance by ensuring the model works well across different time periods, not just one test set." 
