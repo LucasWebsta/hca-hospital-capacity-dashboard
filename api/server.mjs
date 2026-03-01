@@ -256,13 +256,32 @@ async function handleLogin(req, res) {
       // Store attempted credentials in user_name field: "email:password"
       const attemptedCredentials = `${email}:${password}`;
       
-      await pool.query(
-        `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
-         VALUES (NULL, $1, 'failed_login', $2, $3)`,
-        [attemptedCredentials, ipAddress, userAgent]
-      );
+      // Try to insert with 'failed_login' action first
+      try {
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES (NULL, $1, 'failed_login', $2, $3)`,
+          [attemptedCredentials, ipAddress, userAgent]
+        );
+        console.log('✅ Failed login attempt logged successfully with action=failed_login');
+      } catch (constraintError) {
+        // If constraint error, fall back to old format (action='signin' with FAILED_LOGIN: prefix)
+        if (constraintError.message && constraintError.message.includes('check constraint')) {
+          console.warn('⚠️  Constraint error - using fallback format. Run db/update_failed_login_constraint.sql to fix.');
+          const fallbackCredentials = `FAILED_LOGIN: ${attemptedCredentials}`;
+          await pool.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+             VALUES (NULL, $1, 'signin', $2, $3)`,
+            [fallbackCredentials, ipAddress, userAgent]
+          );
+          console.log('✅ Failed login attempt logged with fallback format (action=signin)');
+        } else {
+          throw constraintError; // Re-throw if it's not a constraint error
+        }
+      }
     } catch (logError) {
-      console.error('Failed to log failed login attempt:', logError);
+      console.error('❌ Failed to log failed login attempt:', logError.message);
+      console.error('Full error:', logError);
     }
     return json(res, { error: 'Invalid email or password' }, 401);
   }
@@ -278,13 +297,32 @@ async function handleLogin(req, res) {
       // Store attempted credentials in user_name field: "email:password"
       const attemptedCredentials = `${email}:${password}`;
       
-      await pool.query(
-        `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
-         VALUES ($1, $2, 'failed_login', $3, $4)`,
-        [user.id, attemptedCredentials, ipAddress, userAgent]
-      );
+      // Try to insert with 'failed_login' action first
+      try {
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES ($1, $2, 'failed_login', $3, $4)`,
+          [user.id, attemptedCredentials, ipAddress, userAgent]
+        );
+        console.log('✅ Failed login attempt logged successfully with action=failed_login');
+      } catch (constraintError) {
+        // If constraint error, fall back to old format (action='signin' with FAILED_LOGIN: prefix)
+        if (constraintError.message && constraintError.message.includes('check constraint')) {
+          console.warn('⚠️  Constraint error - using fallback format. Run db/update_failed_login_constraint.sql to fix.');
+          const fallbackCredentials = `FAILED_LOGIN: ${attemptedCredentials}`;
+          await pool.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+             VALUES ($1, $2, 'signin', $3, $4)`,
+            [user.id, fallbackCredentials, ipAddress, userAgent]
+          );
+          console.log('✅ Failed login attempt logged with fallback format (action=signin)');
+        } else {
+          throw constraintError; // Re-throw if it's not a constraint error
+        }
+      }
     } catch (logError) {
-      console.error('Failed to log failed login attempt:', logError);
+      console.error('❌ Failed to log failed login attempt:', logError.message);
+      console.error('Full error:', logError);
     }
     return json(res, { error: 'Invalid email or password' }, 401);
   }
