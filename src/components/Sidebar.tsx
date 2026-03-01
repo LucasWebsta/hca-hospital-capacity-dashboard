@@ -77,20 +77,26 @@ export function Sidebar({ activeTab, onTabChange, facilityName }: SidebarProps) 
       <div style={{ padding: '10px 12px 20px', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
         {/* Logged-in user */}
         {(() => {
-          let user: { firstName?: string; lastName?: string; role?: string } | null = null;
+          let user: { firstName?: string; lastName?: string; role?: string; photoUrl?: string } | null = null;
           try { const raw = sessionStorage.getItem('user'); user = raw ? JSON.parse(raw) : null; } catch {}
           const initials = user ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() : 'HCA';
           const fullName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : 'HCA Healthcare';
           const role = user?.role ?? '';
+          const photoUrl = user?.photoUrl;
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px', borderRadius: 8, marginBottom: 2 }}>
               <div style={{
                 width: 32, height: 32, borderRadius: '50%',
-                background: BRAND_ORANGE,
+                background: BRAND_ORANGE, overflow: 'hidden',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
                 boxShadow: `0 1px 6px rgba(231,89,37,0.45)`,
-              }}>{initials}</div>
+              }}>
+                {photoUrl
+                  ? <img src={photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  : initials
+                }
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
                 <div style={{ fontSize: 10.5, color: '#7a9abd' }}>{role}</div>

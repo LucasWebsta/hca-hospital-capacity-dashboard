@@ -16,7 +16,7 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-function getSessionUser(): { firstName: string; lastName: string; role: string } | null {
+function getSessionUser(): { firstName: string; lastName: string; role: string; photoUrl?: string } | null {
   try {
     const raw = sessionStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
@@ -174,7 +174,7 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
 
 function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
   initials: string;
-  sessionUser: { firstName: string; lastName: string; role: string } | null;
+  sessionUser: { firstName: string; lastName: string; role: string; photoUrl?: string } | null;
   onFacilityChange: (id: number | null, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -196,6 +196,7 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
 
   const fullName = sessionUser ? `${sessionUser.firstName} ${sessionUser.lastName}` : 'User';
   const role = sessionUser?.role ?? '';
+  const photoUrl = sessionUser?.photoUrl;
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -204,12 +205,17 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
         title={fullName}
         style={{
           width: 32, height: 32, borderRadius: '50%',
-          background: BRAND_BLUE,
+          background: BRAND_BLUE, overflow: 'hidden',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
-          boxShadow: `0 1px 6px rgba(9,34,64,0.3)`,
+          boxShadow: `0 1px 6px rgba(9,34,64,0.3)`, flexShrink: 0,
         }}
-      >{initials}</div>
+      >
+        {photoUrl
+          ? <img src={photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : initials
+        }
+      </div>
 
       {open && (
         <div style={{

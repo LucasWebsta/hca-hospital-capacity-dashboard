@@ -34,7 +34,7 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
     () => localStorage.getItem('homeLocation') ?? 'all'
   );
   const [profilePicture, setProfilePicture] = useState<string | null>(
-    () => localStorage.getItem('profilePicture')
+    () => localStorage.getItem('profilePicture') ?? sessionUser?.photoUrl ?? null
   );
   const [notifications, setNotifications] = useState({
     email: localStorage.getItem('notifEmail') !== 'false',
