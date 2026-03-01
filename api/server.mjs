@@ -103,7 +103,6 @@ async function handleFacilities(res) {
     JOIN latest l ON l.facility_id = f.facility_id
     LEFT JOIN day_ago d ON d.facility_id = f.facility_id
     ORDER BY occupancy DESC
-    LIMIT 5
   `);
   json(res, rows);
 }
