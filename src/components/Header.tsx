@@ -212,7 +212,7 @@ function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
         }}
       >
         {photoUrl
-          ? <img src={photoUrl} alt={fullName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img src={photoUrl} alt={fullName} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : initials
         }
       </div>

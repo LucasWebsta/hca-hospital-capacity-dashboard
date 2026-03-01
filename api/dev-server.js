@@ -191,20 +191,24 @@ const server = http.createServer(async (req, res) => {
           WHERE ($1::int IS NULL OR f.facility_id = $1)
         ),
         latest_icu AS (
-          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE LOWER(metric) = 'icu' AND ($1::int IS NULL OR facility_id = $1) GROUP BY facility_id
+          SELECT facility_id, MAX(source_update_date) AS max_ts FROM facility_metrics WHERE (LOWER(metric) = 'icu' OR LOWER(metric) = 'icu occupancy') AND ($1::int IS NULL OR facility_id = $1) GROUP BY facility_id
         ),
         icu_vals AS (
           SELECT fm.facility_id, fm.metric_value FROM facility_metrics fm
-          JOIN latest_icu l ON fm.facility_id = l.facility_id AND fm.source_update_date = l.max_ts AND LOWER(fm.metric) = 'icu'
+          JOIN latest_icu l ON fm.facility_id = l.facility_id AND fm.source_update_date = l.max_ts AND (LOWER(fm.metric) = 'icu' OR LOWER(fm.metric) = 'icu occupancy')
         ),
         icu_total AS (SELECT COALESCE(SUM(metric_value), 0)::int AS total FROM icu_vals),
         recent_avg AS (
           SELECT ROUND(AVG(daily_total))::int AS avg_census FROM (
-            SELECT SUM(metric_value)::int AS daily_total FROM facility_metrics
-            WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
-              AND ($1::int IS NULL OR facility_id = $1)
-              AND (source_update_date AT TIME ZONE 'UTC')::date >= (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '7 days'
-            GROUP BY (source_update_date AT TIME ZONE 'UTC')::date
+            WITH daily_latest AS (
+              SELECT facility_id, (source_update_date AT TIME ZONE 'UTC')::date AS census_date, metric_value,
+                     ROW_NUMBER() OVER (PARTITION BY facility_id, (source_update_date AT TIME ZONE 'UTC')::date ORDER BY source_update_date DESC) AS rn
+              FROM facility_metrics
+              WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
+                AND ($1::int IS NULL OR facility_id = $1)
+                AND (source_update_date AT TIME ZONE 'UTC')::date >= (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '7 days'
+            )
+            SELECT SUM(metric_value)::int AS daily_total FROM daily_latest WHERE rn = 1 GROUP BY census_date
           ) d
         )
         SELECT t.total_census AS "totalCensus", t.total_capacity AS "totalCapacity",
@@ -287,20 +291,63 @@ const server = http.createServer(async (req, res) => {
       return send(res, 200, rows);
     }
 
-    // GET /api/trend (optional ?facility_id= for single facility)
+    // GET /api/trend (optional ?facility_id=, ?series=overall|icu; overall = census + occupancy %, icu = ICU count)
     if (base === 'trend' && method === 'GET') {
       const days = parseInt(query.get('days') || '30', 10);
       const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      const series = (query.get('series') || 'overall').toLowerCase();
+      const isIcu = series === 'icu';
+
+      // One reading per facility per day (latest snapshot) to avoid counting 15-min intervals multiple times
+      // ICU metric may be stored as 'icu' or 'ICU Occupancy' in facility_metrics
+      const metricFilter = isIcu ? "(LOWER(metric) = 'icu' OR LOWER(metric) = 'icu occupancy')" : "LOWER(metric) IN ('total census', 'total')";
       const actuals = await db.query(
-        `SELECT TO_CHAR((source_update_date AT TIME ZONE 'UTC')::date, 'Mon DD') AS date, SUM(metric_value)::int AS actual
-         FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
-         AND ($2::int IS NULL OR facility_id = $2)
-         AND (source_update_date AT TIME ZONE 'UTC')::date >=
-             (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($2::int IS NULL OR facility_id = $2)) - ($1 || ' days')::INTERVAL
-         GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY (source_update_date AT TIME ZONE 'UTC')::date ASC`,
+        `WITH daily_latest AS (
+          SELECT facility_id, (source_update_date AT TIME ZONE 'UTC')::date AS census_date, metric_value,
+                 ROW_NUMBER() OVER (PARTITION BY facility_id, (source_update_date AT TIME ZONE 'UTC')::date ORDER BY source_update_date DESC) AS rn
+          FROM facility_metrics
+          WHERE ${metricFilter} AND ($2::int IS NULL OR facility_id = $2)
+            AND (source_update_date AT TIME ZONE 'UTC')::date >=
+                (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE ${metricFilter} AND ($2::int IS NULL OR facility_id = $2)) - ($1 || ' days')::INTERVAL
+        )
+        SELECT TO_CHAR(census_date, 'Mon DD') AS date, SUM(metric_value)::int AS actual
+        FROM daily_latest WHERE rn = 1
+        GROUP BY census_date ORDER BY census_date ASC`,
         [days, facilityId]
       );
-      const historicalRows = actuals.rows || [];
+      let historicalRows = actuals.rows || [];
+
+      // Overall: add occupancy_pct from total capacity (facilities.capacity)
+      // Census comes from facility_metrics (metric IN ('total census','total')); cap at 100% if data mismatch
+      if (!isIcu && historicalRows.length > 0) {
+        const capResult = await db.query(
+          'SELECT COALESCE(SUM(capacity), 0)::int AS total FROM facilities WHERE $1::int IS NULL OR facility_id = $1',
+          [facilityId]
+        );
+        const totalCapacity = (capResult.rows[0] && capResult.rows[0].total) ? capResult.rows[0].total : 0;
+        historicalRows = historicalRows.map((r) => {
+          const pct = totalCapacity > 0 ? (r.actual / totalCapacity) * 100 : null;
+          return { ...r, occupancy_pct: pct != null ? Math.min(100, Math.round(pct * 10) / 10) : null };
+        });
+      }
+      // ICU: add occupancy_pct from total icu_capacity (facilities.icu_capacity); cap at 100%
+      if (isIcu && historicalRows.length > 0) {
+        try {
+          const icuCapResult = await db.query(
+            'SELECT COALESCE(SUM(icu_capacity), 0)::int AS total FROM facilities WHERE $1::int IS NULL OR facility_id = $1',
+            [facilityId]
+          );
+          const totalIcuCapacity = (icuCapResult.rows[0] && icuCapResult.rows[0].total) ? icuCapResult.rows[0].total : 0;
+          historicalRows = historicalRows.map((r) => {
+            const pct = totalIcuCapacity > 0 ? (r.actual / totalIcuCapacity) * 100 : null;
+            return { ...r, occupancy_pct: pct != null ? Math.min(100, Math.round(pct * 10) / 10) : null };
+          });
+        } catch (e) {
+          if (e.code !== '42703') throw e; // 42703 = undefined column (icu_capacity missing)
+          // else leave occupancy_pct unset so chart still shows ICU counts
+        }
+      }
+
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       if (historicalRows.length >= 2) {
         const last = historicalRows[historicalRows.length - 1];
@@ -326,13 +373,19 @@ const server = http.createServer(async (req, res) => {
     if (base === 'forecast' && method === 'GET') {
       const days = parseInt(query.get('days') || '7', 10);
       const facilityId = query.get('facility_id') ? parseInt(query.get('facility_id'), 10) : null;
+      // One reading per facility per day (latest snapshot) to avoid counting 15-min intervals multiple times
       const { rows: recent } = await db.query(
-        `SELECT (source_update_date AT TIME ZONE 'UTC')::date AS census_date, SUM(metric_value)::int AS total
-        FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total')
-        AND ($1::int IS NULL OR facility_id = $1)
-        AND (source_update_date AT TIME ZONE 'UTC')::date >=
-            (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '14 days'
-        GROUP BY (source_update_date AT TIME ZONE 'UTC')::date ORDER BY census_date ASC`,
+        `WITH daily_latest AS (
+          SELECT facility_id, (source_update_date AT TIME ZONE 'UTC')::date AS census_date, metric_value,
+                 ROW_NUMBER() OVER (PARTITION BY facility_id, (source_update_date AT TIME ZONE 'UTC')::date ORDER BY source_update_date DESC) AS rn
+          FROM facility_metrics
+          WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)
+            AND (source_update_date AT TIME ZONE 'UTC')::date >=
+                (SELECT (MAX(source_update_date) AT TIME ZONE 'UTC')::date FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total') AND ($1::int IS NULL OR facility_id = $1)) - INTERVAL '14 days'
+        )
+        SELECT census_date, SUM(metric_value)::int AS total
+        FROM daily_latest WHERE rn = 1
+        GROUP BY census_date ORDER BY census_date ASC`,
         [facilityId]
       );
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
