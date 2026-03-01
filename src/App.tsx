@@ -33,7 +33,18 @@ function App() {
     else navigate("/" + tab);
   };
 
-  const [trendDays, setTrendDays] = useState(30);
+  const [trendDays, setTrendDays] = useState(() => {
+    try {
+      const raw = sessionStorage.getItem("user");
+      if (!raw) return 30;
+      const user = JSON.parse(raw) as { defaultTrendDays?: number };
+      const d = user?.defaultTrendDays;
+      if (typeof d === "number" && [7, 14, 30, 60].includes(d)) return d;
+    } catch {
+      // ignore
+    }
+    return 30;
+  });
   const [selectedFacilityId, setSelectedFacilityId] = useState<number | null>(
     null,
   );

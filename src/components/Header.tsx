@@ -16,7 +16,7 @@ const pill: React.CSSProperties = {
   boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
-function getSessionUser(): { firstName: string; lastName: string; role: string; photoUrl?: string } | null {
+function getSessionUser(): { id?: number; firstName: string; lastName: string; role: string; photoUrl?: string; defaultTrendDays?: number } | null {
   try {
     const raw = sessionStorage.getItem('user');
     return raw ? JSON.parse(raw) : null;
@@ -175,7 +175,27 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
           options={TREND_DAYS.map(d => d.label)}
           onSelect={(v) => {
             const match = TREND_DAYS.find(d => d.label === v);
-            if (match) onTrendDaysChange(match.value);
+            if (match) {
+              onTrendDaysChange(match.value);
+              const user = getSessionUser();
+              const userId = user?.id != null ? Number(user.id) : null;
+              if (userId != null && !Number.isNaN(userId)) {
+                api.updateMyDefaultTrendDays(userId, match.value).then(() => {
+                  try {
+                    const raw = sessionStorage.getItem('user');
+                    if (raw) {
+                      const u = JSON.parse(raw);
+                      u.defaultTrendDays = match.value;
+                      sessionStorage.setItem('user', JSON.stringify(u));
+                    }
+                  } catch {
+                    // ignore
+                  }
+                }).catch((err) => {
+                  console.error('Failed to save default date range:', err?.message ?? err);
+                });
+              }
+            }
           }}
         />
 
