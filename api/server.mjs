@@ -12,6 +12,7 @@
  */
 import http from 'http';
 import pg from 'pg';
+import bcrypt from 'bcryptjs';
 
 const { Pool } = pg;
 const pool = new Pool({
@@ -414,8 +415,12 @@ async function handleLogin(req, res) {
 
   const user = rows[0];
 
-  // Plain-text password check (demo — hashes are stored as plaintext)
-  if (user.password_hash !== password) {
+  // Password check: bcrypt if hash starts with $2b$/$2a$, otherwise plain-text fallback for legacy rows
+  const isLegacyPlain = !user.password_hash.startsWith('$2');
+  const passwordMatch = isLegacyPlain
+    ? user.password_hash === password
+    : await bcrypt.compare(password, user.password_hash);
+  if (!passwordMatch) {
     // Log failed login attempt for wrong password
     try {
       const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
@@ -493,8 +498,9 @@ async function handleUsers(req, res) {
     if (!firstName || !lastName || !email || !role) {
       return json(res, { error: 'firstName, lastName, email, and role are required' }, 400);
     }
-    // Use provided password or default to 'Demo1234!' if not provided
-    const passwordHash = password || 'Demo1234!';
+    // Hash the password before storing (bcrypt, cost factor 10)
+    const rawPassword = password || 'Demo1234!';
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
     const { rows } = await pool.query(
       `INSERT INTO users (first_name, last_name, email, role, home_facility_id, password_hash, is_active)
        VALUES ($1, $2, $3, $4, $5, $6, true)
