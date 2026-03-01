@@ -9,7 +9,9 @@ import {
   FacilitiesAtRisk,
   AlertsPanel,
   ReportsPanel,
+  InfoTooltip,
 } from "./components";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import ForecastPage from "./components/ForecastPage";
 import { api } from "./api";
 import type { CensusMetrics } from "./api";
@@ -43,6 +45,8 @@ function App() {
     occupancyRate: 85.2,
     sevenDayForecast: 963,
   });
+  const [overviewMetricsExpanded, setOverviewMetricsExpanded] = useState(false);
+  const [metricTooltipsOn, setMetricTooltipsOn] = useState(true);
 
   useEffect(() => {
     api
@@ -80,34 +84,12 @@ function App() {
             setSelectedFacilityId(id);
             setSelectedFacilityName(name);
           }}
-          selectedFacilityId={selectedFacilityId}
           selectedFacilityName={selectedFacilityName}
         />
 
         {activeTab === "dashboard" && (
           <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
-            <div style={{ marginBottom: 20 }}>
-              <div
-                style={{
-                  fontSize: 20,
-                  fontWeight: 800,
-                  color: "#0f172a",
-                  letterSpacing: -0.3,
-                }}
-              >
-                Census Command
-              </div>
-              <div
-                style={{
-                  fontSize: 12.5,
-                  color: "#94a3b8",
-                  marginTop: 3,
-                  fontWeight: 500,
-                }}
-              >
-                Real-time hospital occupancy · Updated just now
-              </div>
-            </div>
+            
             <div
               style={{
                 display: "grid",
@@ -139,41 +121,42 @@ function App() {
                     }}
                   >
                     <div>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          fontSize: 14,
-                          color: "#0f172a",
-                        }}
-                      >
-                        Hospital System Overview
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>
+                          Hospital System Overview
+                        </span>
+                        {metricTooltipsOn && (
+                          <InfoTooltip text="Key metrics for the selected facility or all facilities. Use the facility filter in the header to focus on one site. Data refreshes from your census system." />
+                        )}
+                        {metricTooltipsOn && (
+                          <button
+                            type="button"
+                            aria-expanded={overviewMetricsExpanded}
+                            aria-label={overviewMetricsExpanded ? "Hide metric explanations" : "Show metric explanations"}
+                            onClick={() => setOverviewMetricsExpanded((e) => !e)}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              border: "1px solid #e2e8f0",
+                              background: overviewMetricsExpanded ? "#e8eef8" : "#f8fafc",
+                              color: "#092240",
+                              cursor: "pointer",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {overviewMetricsExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </button>
+                        )}
                       </div>
-                      <div
-                        style={{
-                          fontSize: 11.5,
-                          color: "#94a3b8",
-                          marginTop: 2,
-                        }}
-                      >
-                        {selectedFacilityId
-                          ? selectedFacilityName
-                          : `Across all facilities`}{" "}
-                        · Real-time
+                      <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 2 }}>
+                        {selectedFacilityId ? selectedFacilityName : "Across all facilities"} · Real-time
                       </div>
                     </div>
-                    <span
-                      style={{
-                        fontSize: 11,
-                        background: "#f0fdf4",
-                        color: "#16a34a",
-                        borderRadius: 5,
-                        padding: "3px 9px",
-                        fontWeight: 700,
-                        border: "1px solid #bbf7d0",
-                      }}
-                    >
-                      ● Live
-                    </span>
+                    
                   </div>
                   <div
                     style={{
@@ -189,6 +172,8 @@ function App() {
                       change="+7 beds"
                       subtext="Occupied Beds"
                       accentColor="#092240"
+                      tooltip="Total number of beds currently in use across the selected facility or system."
+                      expanded={metricTooltipsOn ? overviewMetricsExpanded : false}
                     />
                     <MetricCard
                       title="Occupancy Rate"
@@ -197,6 +182,8 @@ function App() {
                       subtext="of total capacity"
                       progressBar={`${Math.round(Number(census.occupancyRate))}%`}
                       accentColor="#092240"
+                      tooltip="Percentage of total beds that are occupied. Higher rates may require capacity planning or surge response."
+                      expanded={metricTooltipsOn ? overviewMetricsExpanded : false}
                     />
                     <MetricCard
                       title="7-Day Forecast"
@@ -212,6 +199,8 @@ function App() {
                       }
                       subtext="Predicted Peak"
                       accentColor="#E75925"
+                      tooltip="Expected occupancy level in 7 days based on recent trends."
+                      expanded={metricTooltipsOn ? overviewMetricsExpanded : false}
                     />
                     <MetricCard
                       title="Risk Level"
@@ -223,6 +212,8 @@ function App() {
                             : "Normal"
                       }
                       type="alert"
+                      tooltip="Overall risk based on occupancy: High (≥90%), Moderate (≥85%), or Normal."
+                      expanded={metricTooltipsOn ? overviewMetricsExpanded : false}
                     />
                   </div>
                 </div>
@@ -230,9 +221,11 @@ function App() {
                 <OccupancyTrendChart
                   days={trendDays}
                   facilityId={selectedFacilityId ?? undefined}
+                  tooltipsOn={metricTooltipsOn}
                 />
                 <FacilitiesAtRisk
                   facilityId={selectedFacilityId ?? undefined}
+                  tooltipsOn={metricTooltipsOn}
                 />
               </div>
 
@@ -241,9 +234,62 @@ function App() {
               >
                 <ForecastOccupancyChart
                   facilityId={selectedFacilityId ?? undefined}
+                  tooltipsOn={metricTooltipsOn}
                 />
-                <AlertsPanel />
+                <AlertsPanel tooltipsOn={metricTooltipsOn} />
               </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: 24,
+                paddingTop: 16,
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-end",
+                gap: 10,
+                maxWidth: 1440,
+              }}
+            >
+              <label
+                htmlFor="metric-tooltips-toggle"
+                style={{ fontSize: 12.5, color: "#64748b", fontWeight: 500, cursor: "pointer" }}
+              >
+                Show explanations and tooltips
+              </label>
+              <button
+                id="metric-tooltips-toggle"
+                type="button"
+                role="switch"
+                aria-checked={metricTooltipsOn}
+                aria-label="Toggle explanations and tooltips on or off"
+                onClick={() => setMetricTooltipsOn((on) => !on)}
+                style={{
+                  width: 40,
+                  height: 22,
+                  borderRadius: 11,
+                  border: "1px solid #cbd5e1",
+                  background: metricTooltipsOn ? "#092240" : "#e2e8f0",
+                  cursor: "pointer",
+                  position: "relative",
+                  flexShrink: 0,
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: metricTooltipsOn ? 20 : 2,
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                    transition: "left 0.15s ease",
+                  }}
+                />
+              </button>
             </div>
           </div>
         )}

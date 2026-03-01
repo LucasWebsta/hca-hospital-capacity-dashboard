@@ -368,7 +368,41 @@ async function handleLogin(req, res) {
     [email]
   );
 
+  // Log failed login attempt if user not found
   if (rows.length === 0) {
+    try {
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+      // Store attempted credentials in user_name field: "email:password"
+      const attemptedCredentials = `${email}:${password}`;
+      
+      // Try to insert with 'failed_login' action first
+      try {
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES (NULL, $1, 'failed_login', $2, $3)`,
+          [attemptedCredentials, ipAddress, userAgent]
+        );
+        console.log('✅ Failed login attempt logged successfully with action=failed_login');
+      } catch (constraintError) {
+        // If constraint error, fall back to old format (action='signin' with FAILED_LOGIN: prefix)
+        if (constraintError.message && constraintError.message.includes('check constraint')) {
+          console.warn('⚠️  Constraint error - using fallback format. Run db/update_failed_login_constraint.sql to fix.');
+          const fallbackCredentials = `FAILED_LOGIN: ${attemptedCredentials}`;
+          await pool.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+             VALUES (NULL, $1, 'signin', $2, $3)`,
+            [fallbackCredentials, ipAddress, userAgent]
+          );
+          console.log('✅ Failed login attempt logged with fallback format (action=signin)');
+        } else {
+          throw constraintError; // Re-throw if it's not a constraint error
+        }
+      }
+    } catch (logError) {
+      console.error('❌ Failed to log failed login attempt:', logError.message);
+      console.error('Full error:', logError);
+    }
     return json(res, { error: 'Invalid email or password' }, 401);
   }
 
@@ -376,7 +410,57 @@ async function handleLogin(req, res) {
 
   // Plain-text password check (demo — hashes are stored as plaintext)
   if (user.password_hash !== password) {
+    // Log failed login attempt for wrong password
+    try {
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+      // Store attempted credentials in user_name field: "email:password"
+      const attemptedCredentials = `${email}:${password}`;
+      
+      // Try to insert with 'failed_login' action first
+      try {
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES ($1, $2, 'failed_login', $3, $4)`,
+          [user.id, attemptedCredentials, ipAddress, userAgent]
+        );
+        console.log('✅ Failed login attempt logged successfully with action=failed_login');
+      } catch (constraintError) {
+        // If constraint error, fall back to old format (action='signin' with FAILED_LOGIN: prefix)
+        if (constraintError.message && constraintError.message.includes('check constraint')) {
+          console.warn('⚠️  Constraint error - using fallback format. Run db/update_failed_login_constraint.sql to fix.');
+          const fallbackCredentials = `FAILED_LOGIN: ${attemptedCredentials}`;
+          await pool.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+             VALUES ($1, $2, 'signin', $3, $4)`,
+            [user.id, fallbackCredentials, ipAddress, userAgent]
+          );
+          console.log('✅ Failed login attempt logged with fallback format (action=signin)');
+        } else {
+          throw constraintError; // Re-throw if it's not a constraint error
+        }
+      }
+    } catch (logError) {
+      console.error('❌ Failed to log failed login attempt:', logError.message);
+      console.error('Full error:', logError);
+    }
     return json(res, { error: 'Invalid email or password' }, 401);
+  }
+
+  // Log sign-in activity
+  try {
+    const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    const userName = `${user.first_name} ${user.last_name}`;
+    
+    await pool.query(
+      `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+       VALUES ($1, $2, 'signin', $3, $4)`,
+      [user.id, userName, ipAddress, userAgent]
+    );
+  } catch (logError) {
+    // Log error but don't fail the login
+    console.error('Failed to log sign-in activity:', logError);
   }
 
   const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role);
@@ -399,15 +483,17 @@ async function handleUsers(req, res) {
   if (req.method === 'POST') {
     let body = '';
     for await (const chunk of req) body += chunk;
-    const { firstName, lastName, email, role, homeFacilityId } = JSON.parse(body || '{}');
+    const { firstName, lastName, email, role, homeFacilityId, password } = JSON.parse(body || '{}');
     if (!firstName || !lastName || !email || !role) {
       return json(res, { error: 'firstName, lastName, email, and role are required' }, 400);
     }
+    // Use provided password or default to 'Demo1234!' if not provided
+    const passwordHash = password || 'Demo1234!';
     const { rows } = await pool.query(
       `INSERT INTO users (first_name, last_name, email, role, home_facility_id, password_hash, is_active)
-       VALUES ($1, $2, $3, $4, $5, 'Demo1234!', true)
+       VALUES ($1, $2, $3, $4, $5, $6, true)
        RETURNING id, first_name, last_name, email, role, home_facility_id, is_active, created_at`,
-      [firstName, lastName, email, role, homeFacilityId || null]
+      [firstName, lastName, email, role, homeFacilityId || null, passwordHash]
     );
     return json(res, rows[0], 201);
   }
@@ -422,8 +508,23 @@ async function handleUsers(req, res) {
 // ── /api/users/:id ───────────────────────────────────────────────────────────
 async function handleUserById(req, res, id) {
   if (req.method === 'DELETE') {
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
-    return json(res, { success: true });
+    try {
+      // Preserve activity logs by setting user_id to NULL instead of deleting them
+      // This maintains audit trail even after user deletion
+      await pool.query('UPDATE activity_logs SET user_id = NULL WHERE user_id = $1', [id]);
+      
+      // Then delete the user
+      const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+      
+      if (result.rowCount === 0) {
+        return json(res, { error: 'User not found' }, 404);
+      }
+      
+      return json(res, { success: true });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return json(res, { error: 'Failed to delete user' }, 500);
+    }
   }
   json(res, { error: 'Method not allowed' }, 405);
 }
@@ -450,8 +551,35 @@ async function handleActivity(req, res, searchParams) {
 }
 
 // ── /api/auth/logout ──────────────────────────────────────────────────────────
-function handleLogout(res) {
-  json(res, { success: true });
+async function handleLogout(req, res) {
+  try {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const { userId, userName } = JSON.parse(body || '{}');
+
+    // Log sign-out activity if user info is provided
+    if (userId || userName) {
+      try {
+        const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES ($1, $2, 'signout', $3, $4)`,
+          [userId || null, userName || 'Unknown', ipAddress, userAgent]
+        );
+      } catch (logError) {
+        // Log error but don't fail the logout
+        console.error('Failed to log sign-out activity:', logError);
+      }
+    }
+
+    return json(res, { success: true });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still return success even if logging fails
+    return json(res, { success: true });
+  }
 }
 
 // ── /api/forecast ─────────────────────────────────────────────────────────────
@@ -521,7 +649,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (path === '/auth/login' && req.method === 'POST') return await handleLogin(req, res);
-    if (path === '/auth/logout' && req.method === 'POST') return handleLogout(res);
+    if (path === '/auth/logout' && req.method === 'POST') return await handleLogout(req, res);
     if (path === '/users' && (req.method === 'GET' || req.method === 'POST')) return await handleUsers(req, res);
     if (/^\/users\/\d+$/.test(path)) return await handleUserById(req, res, path.split('/')[2]);
     if (path === '/activity') return await handleActivity(req, res, url.searchParams);

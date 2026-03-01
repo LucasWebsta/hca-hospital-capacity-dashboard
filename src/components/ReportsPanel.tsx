@@ -332,7 +332,7 @@ export function ReportsPanel() {
           {config.sections.includes('overview') && (
             <Section title="Overview">
               {isSnapshotView && data?.census ? (
-                <OverviewBlock census={data.census} facilityName={config.facilityName} />
+                <OverviewBlock census={data.census} />
               ) : (
                 <LiveOverview facilityId={config.facilityId} facilityName={config.facilityName} />
               )}
@@ -405,10 +405,10 @@ function LiveOverview({ facilityId, facilityName }: { facilityId: number | null;
     api.getCensusMetrics(facilityId ?? undefined).then(setCensus).catch(console.error);
   }, [facilityId]);
   if (!census) return <div style={{ padding: 16, color: '#94a3b8' }}>Loading…</div>;
-  return <OverviewBlock census={census} facilityName={facilityName} />;
+  return <OverviewBlock census={census} />;
 }
 
-function OverviewBlock({ census, facilityName }: { census: CensusMetrics; facilityName: string }) {
+function OverviewBlock({ census }: { census: CensusMetrics }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
       <MetricCard title="Current Census" value={census.totalCensus} unit={String(census.totalCapacity)} subtext="Occupied Beds" accentColor={BRAND_BLUE} />

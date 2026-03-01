@@ -10,15 +10,53 @@
             background: #edf1f8;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
+        /* HCA Brand colors */
+        .brand-blue { color: #092240; }
+        .brand-orange { color: #E75925; border-color: #E75925; }
+        .bg-brand-blue { background-color: #092240; }
+        .bg-brand-orange { background-color: #E75925; }
+        
+        /* Scroll boxes */
+        .scroll-box {
+            max-height: calc(100vh - 300px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        .scroll-box::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scroll-box::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .scroll-box::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .scroll-box::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Sticky table header */
+        .table-container {
+            position: relative;
+        }
+        .table-container thead {
+            position: sticky;
+            top: 0;
+            background: white;
+            z-index: 10;
+        }
     </style>
 </head>
 <body class="min-h-screen p-6">
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+        <div class="bg-white rounded-xl shadow-sm border-b-4 border-brand-orange p-6 mb-6" style="border-bottom: 3px solid #E75925; box-shadow: 0 2px 8px rgba(9,34,64,0.08);">
             <div class="flex items-center justify-between">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-900">Admin Panel</h1>
+                    <h1 class="text-3xl font-bold brand-blue" style="color: #092240;">Admin Panel</h1>
                     <p class="text-gray-600 mt-1">User Management & Activity Logs</p>
                 </div>
                 <div class="flex items-center gap-4">
@@ -26,7 +64,7 @@
                         <p class="text-sm text-gray-600">Logged in as</p>
                         <p class="font-semibold text-gray-900" id="loggedInUser">Kevin</p>
                     </div>
-                    <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold" id="userInitials">
+                    <div class="w-12 h-12 bg-brand-blue rounded-full flex items-center justify-center text-white font-bold" id="userInitials" style="background-color: #092240;">
                         K
                     </div>
                     <button
@@ -39,23 +77,25 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="grid gap-6" style="grid-template-columns: 1.5fr 1fr;">
             <!-- LEFT COLUMN - User Management -->
-            <div class="lg:col-span-2">
+            <div>
                 <!-- Users List -->
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full flex flex-col">
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="text-xl font-bold text-gray-900">Users</h2>
                         <button
                             onclick="openAddUserModal()"
-                            class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition shadow-sm"
+                            class="px-4 py-2 bg-brand-blue hover:opacity-90 text-white font-semibold rounded-lg transition shadow-sm"
+                            style="background-color: #092240;"
+                            id="addUserBtn"
                         >
                             + Add User
                         </button>
                     </div>
 
                     <!-- Users Table -->
-                    <div class="overflow-x-auto">
+                    <div class="table-container scroll-box flex-1">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-200">
@@ -75,8 +115,8 @@
             </div>
 
             <!-- RIGHT COLUMN - Activity Logs -->
-            <div class="lg:col-span-1">
-                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 h-full flex flex-col">
                     <h2 class="text-xl font-bold text-gray-900 mb-6">Activity Logs</h2>
                     
                     <!-- Filter -->
@@ -89,11 +129,12 @@
                             <option value="all">All Activities</option>
                             <option value="signin">Sign In</option>
                             <option value="signout">Sign Out</option>
+                            <option value="failed_login">Failed Login Attempt</option>
                         </select>
                     </div>
 
                     <!-- Logs List -->
-                    <div class="space-y-3 max-h-96 overflow-y-auto" id="logsContainer">
+                    <div class="scroll-box flex-1" id="logsContainer">
                         <!-- Logs will be populated here -->
                     </div>
                 </div>
@@ -149,10 +190,10 @@
                         required
                         class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                        <option value="Executive Director">Executive Director</option>
-                        <option value="Administrator">Administrator</option>
-                        <option value="Manager">Manager</option>
-                        <option value="Analyst">Analyst</option>
+                        <option value="Super Admin">Super Admin</option>
+                        <option value="Regional Manager">Regional Manager</option>
+                        <option value="Facility Administrator">Facility Administrator</option>
+                        <option value="Operator">Operator</option>
                         <option value="Viewer">Viewer</option>
                     </select>
                 </div>
@@ -170,7 +211,8 @@
                 <div class="flex gap-3 pt-4">
                     <button
                         type="submit"
-                        class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                        class="flex-1 px-4 py-2 text-white font-semibold rounded-lg transition hover:opacity-90"
+                        style="background-color: #092240;"
                     >
                         Add User
                     </button>
@@ -210,6 +252,62 @@
         </div>
     </div>
 
+    <!-- Failed Login Details Modal -->
+    <div id="failedLoginModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black bg-opacity-50" onclick="closeModalOnBackdrop(event)">
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-bold text-gray-900">Failed Login Attempt Details</h3>
+                    <button onclick="closeFailedLoginModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900" id="failedLoginEmail">
+                        -
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Password Attempted</label>
+                    <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-mono text-sm" id="failedLoginPassword">
+                        -
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Machine / User Agent</label>
+                    <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm" id="failedLoginUserAgent">
+                        -
+                    </div>
+                </div>
+                <div id="failedLoginIpContainer" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">IP Address</label>
+                    <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-mono text-sm" id="failedLoginIp">
+                        -
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Timestamp</label>
+                    <div class="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm" id="failedLoginTimestamp">
+                        -
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <button
+                        onclick="closeFailedLoginModal()"
+                        class="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Authentication check - only Kevin can access admin page
         (function() {
@@ -217,7 +315,7 @@
             const isAdmin = sessionStorage.getItem('isAdmin');
             
             if (!userStr || !isAdmin || isAdmin !== 'true') {
-                // Not authenticated or not Kevin - redirect to login
+                // Not authenticated or not an admin - redirect to login
                 alert('Access denied. Only Kevin can access the admin page.');
                 window.location.href = 'login.html';
                 return;
@@ -248,7 +346,25 @@
             try {
                 const response = await fetch(`${API_BASE}/users`);
                 if (response.ok) {
-                    users = await response.json();
+                    const data = await response.json();
+                    // Transform API response to match frontend format and filter out admin (Kevin)
+                    users = data
+                        .map(user => ({
+                            id: user.id,
+                            firstName: user.first_name || user.firstName,
+                            lastName: user.last_name || user.lastName,
+                            email: user.email,
+                            role: user.role,
+                            status: user.is_active !== undefined ? (user.is_active ? 'Active' : 'Inactive') : (user.status || 'Active'),
+                            first_name: user.first_name,
+                            last_name: user.last_name,
+                            is_active: user.is_active
+                        }))
+                        .filter(user => {
+                            // Filter out admin user (Kevin)
+                            const firstName = (user.first_name || user.firstName || '').toLowerCase();
+                            return firstName !== 'kevin';
+                        });
                     renderUsers();
                 } else {
                     console.error('Failed to load users');
@@ -261,9 +377,17 @@
         // Load activity logs from API
         async function loadActivityLogs(filter = 'all') {
             try {
-                const url = filter === 'all' 
-                    ? `${API_BASE}/activity?limit=50`
-                    : `${API_BASE}/activity?action=${filter}&limit=50`;
+                // For failed_login, we need to load all logs to catch both old format (action='signin' with FAILED_LOGIN: prefix)
+                // and new format (action='failed_login')
+                let url;
+                if (filter === 'failed_login') {
+                    url = `${API_BASE}/activity?limit=100`;
+                } else if (filter === 'all') {
+                    url = `${API_BASE}/activity?limit=50`;
+                } else {
+                    url = `${API_BASE}/activity?action=${filter}&limit=50`;
+                }
+                
                 const response = await fetch(url);
                 if (response.ok) {
                     activityLogs = await response.json();
@@ -278,79 +402,140 @@
 
         function renderUsers() {
             const tbody = document.getElementById('usersTableBody');
-            tbody.innerHTML = users.map(user => `
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-gray-500">No users found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = users.map(user => {
+                // Handle both API response formats (first_name/last_name or firstName/lastName)
+                const firstName = user.first_name || user.firstName || '';
+                const lastName = user.last_name || user.lastName || '';
+                const email = user.email || '';
+                const role = user.role || '';
+                const status = user.is_active !== undefined ? (user.is_active ? 'Active' : 'Inactive') : (user.status || 'Active');
+                
+                // Role badge colors
+                let roleClass = 'bg-gray-100 text-gray-700';
+                if (role === 'Super Admin') roleClass = 'bg-purple-100 text-purple-700';
+                else if (role === 'Regional Manager') roleClass = 'bg-blue-100 text-blue-700';
+                else if (role === 'Facility Administrator') roleClass = 'bg-green-100 text-green-700';
+                else if (role === 'Operator') roleClass = 'bg-yellow-100 text-yellow-700';
+                
+                return `
                 <tr class="border-b border-gray-100 hover:bg-gray-50">
                     <td class="py-3 px-4">
-                        <div class="font-medium text-gray-900">${user.firstName} ${user.lastName}</div>
+                        <div class="font-medium text-gray-900">${firstName} ${lastName}</div>
                     </td>
-                    <td class="py-3 px-4 text-gray-600">${user.email}</td>
+                    <td class="py-3 px-4 text-gray-600">${email}</td>
                     <td class="py-3 px-4">
-                        <span class="px-2 py-1 text-xs font-medium rounded-full ${
-                            user.role === 'Administrator' ? 'bg-purple-100 text-purple-700' :
-                            user.role === 'Executive Director' ? 'bg-blue-100 text-blue-700' :
-                            user.role === 'Manager' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-700'
-                        }">
-                            ${user.role}
+                        <span class="px-2 py-1 text-xs font-medium rounded-full ${roleClass} whitespace-nowrap inline-block">
+                            ${role}
                         </span>
                     </td>
                     <td class="py-3 px-4">
                         <span class="px-2 py-1 text-xs font-medium rounded-full ${
-                            (user.status || 'Active') === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                            status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                         }">
-                            ${user.status || 'Active'}
+                            ${status}
                         </span>
                     </td>
                     <td class="py-3 px-4 text-right">
                         <button
                             onclick="deleteUser(${user.id})"
-                            class="text-red-600 hover:text-red-800 font-medium text-sm"
+                            class="text-red-600 hover:text-red-800 font-medium text-sm cursor-pointer px-2 py-1 rounded hover:bg-red-50 transition"
+                            type="button"
                         >
                             Remove
                         </button>
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         function renderLogs(filter = 'all') {
             const container = document.getElementById('logsContainer');
+            if (!container) {
+                console.error('logsContainer not found');
+                return;
+            }
+            
             let filteredLogs = [...activityLogs];
             
-            if (filter !== 'all') {
+            if (filter === 'failed_login') {
+                // Filter for failed login attempts - handle both old format (action='signin' with FAILED_LOGIN: prefix)
+                // and new format (action='failed_login')
+                filteredLogs = filteredLogs.filter(log => {
+                    const userName = log.user_name || log.userName || '';
+                    return log.action === 'failed_login' || 
+                           (log.action === 'signin' && userName.startsWith('FAILED_LOGIN:'));
+                });
+            } else if (filter === 'signin') {
+                // For signin filter, exclude failed login attempts (both old and new format)
+                filteredLogs = filteredLogs.filter(log => {
+                    const userName = log.user_name || log.userName || '';
+                    return log.action === 'signin' && !userName.startsWith('FAILED_LOGIN:');
+                });
+            } else if (filter !== 'all') {
+                // Filter by action type
                 filteredLogs = filteredLogs.filter(log => log.action === filter);
             }
 
             // Sort by timestamp (newest first) - already sorted by API, but ensure it
             filteredLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+            if (filteredLogs.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-8">No activity logs found</p>';
+                return;
+            }
+            
             container.innerHTML = filteredLogs.slice(0, 20).map(log => {
                 const date = new Date(log.timestamp);
                 const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                 const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
                 const isSignIn = log.action === 'signin';
+                const userName = log.user_name || log.userName || 'Unknown';
+                // Check if this is a failed login (new format: action='failed_login' or old format: action='signin' with FAILED_LOGIN: prefix)
+                const isFailedLogin = log.action === 'failed_login' || (log.action === 'signin' && userName.startsWith('FAILED_LOGIN:'));
+                
+                let displayName = userName;
+                let displayAction = isSignIn && !isFailedLogin ? 'Signed in' : isFailedLogin ? 'Failed login attempt' : 'Signed out';
+                let bgColor = isSignIn && !isFailedLogin ? 'bg-green-500' : isFailedLogin ? 'bg-orange-500' : 'bg-red-500';
+                
+                if (isFailedLogin) {
+                    // Parse failed login - handle both formats
+                    let emailPassword = userName;
+                    if (userName.startsWith('FAILED_LOGIN: ')) {
+                        // Old format: "FAILED_LOGIN: email:password"
+                        emailPassword = userName.replace('FAILED_LOGIN: ', '');
+                    }
+                    // New format: "email:password"
+                    const parts = emailPassword.split(':');
+                    const attemptedEmail = parts[0] || 'Unknown';
+                    const attemptedPassword = parts.slice(1).join(':') || '***';
+                    displayName = attemptedEmail;
+                    displayAction = `Failed login attempt - Password: ${attemptedPassword}`;
+                }
+                
+                // Make failed login attempts clickable (both old and new format)
+                const clickHandler = isFailedLogin ? `onclick="showFailedLoginDetails(${log.id})"` : '';
+                const cursorStyle = isFailedLogin ? 'cursor-pointer hover:bg-gray-100' : '';
                 
                 return `
-                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                        <div class="w-2 h-2 rounded-full mt-2 ${
-                            isSignIn ? 'bg-green-500' : 'bg-red-500'
-                        }"></div>
+                    <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg mb-3 ${cursorStyle}" ${clickHandler}>
+                        <div class="w-2 h-2 rounded-full mt-2 ${bgColor}"></div>
                         <div class="flex-1">
                             <div class="flex items-center justify-between">
-                                <p class="font-medium text-gray-900 text-sm">${log.userName}</p>
+                                <p class="font-medium text-gray-900 text-sm">${displayName}</p>
                                 <p class="text-xs text-gray-500">${dateStr} ${timeStr}</p>
                             </div>
-                            <p class="text-xs text-gray-600 mt-1">
-                                ${isSignIn ? 'Signed in' : 'Signed out'}
+                            <p class="text-xs ${isFailedLogin ? 'text-orange-700 font-semibold' : 'text-gray-600'} mt-1">
+                                ${displayAction}
                             </p>
                         </div>
                     </div>
                 `;
             }).join('');
-
-            if (filteredLogs.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-center py-8">No activity logs found</p>';
-            }
         }
 
         function filterLogs() {
@@ -373,18 +558,110 @@
             if (event.target === event.currentTarget) {
                 closeAddUserModal();
                 closeDeleteModal();
+                closeFailedLoginModal();
             }
+        }
+
+        function showFailedLoginDetails(logId) {
+            // Find the log entry from activityLogs array
+            const log = activityLogs.find(l => l.id == logId || l.id === logId);
+            if (!log) {
+                console.error('Log entry not found:', logId);
+                return;
+            }
+            
+            // Parse failed login data - handle both old and new formats
+            const userName = log.user_name || log.userName || '';
+            let emailPassword = userName;
+            if (userName.startsWith('FAILED_LOGIN: ')) {
+                // Old format: "FAILED_LOGIN: email:password"
+                emailPassword = userName.replace('FAILED_LOGIN: ', '');
+            }
+            // New format: "email:password"
+            const parts = emailPassword.split(':');
+            const attemptedEmail = parts[0] || 'Unknown';
+            const attemptedPassword = parts.slice(1).join(':') || '***';
+            
+            // Get IP address and user agent
+            const ipAddress = log.ip_address || 'unknown';
+            const userAgent = log.user_agent || 'Unknown';
+            
+            // Format timestamp
+            const timestamp = new Date(log.timestamp);
+            const formattedTimestamp = timestamp.toLocaleString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            // Populate modal
+            document.getElementById('failedLoginEmail').textContent = attemptedEmail;
+            document.getElementById('failedLoginPassword').textContent = attemptedPassword;
+            document.getElementById('failedLoginUserAgent').textContent = userAgent;
+            document.getElementById('failedLoginTimestamp').textContent = formattedTimestamp;
+            
+            // Show IP address only if it's not "unknown"
+            const ipContainer = document.getElementById('failedLoginIpContainer');
+            const ipElement = document.getElementById('failedLoginIp');
+            if (ipAddress && ipAddress.toLowerCase() !== 'unknown') {
+                ipElement.textContent = ipAddress;
+                ipContainer.classList.remove('hidden');
+            } else {
+                ipContainer.classList.add('hidden');
+            }
+            
+            // Show modal
+            document.getElementById('failedLoginModal').classList.remove('hidden');
+            document.getElementById('failedLoginModal').classList.add('flex');
+        }
+
+        function closeFailedLoginModal() {
+            document.getElementById('failedLoginModal').classList.add('hidden');
+            document.getElementById('failedLoginModal').classList.remove('flex');
         }
 
         async function handleAddUser(event) {
             event.preventDefault();
             
+            const firstName = document.getElementById('newFirstName').value.trim();
+            const lastName = document.getElementById('newLastName').value.trim();
+            const email = document.getElementById('newEmail').value.trim();
+            const role = document.getElementById('newRole').value;
+            const password = document.getElementById('newPassword').value;
+            
+            // Client-side validation
+            if (!firstName || !lastName) {
+                alert('First name and last name are required');
+                return;
+            }
+            
+            // Email validation
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Please enter a valid email address');
+                return;
+            }
+            
+            // Password validation
+            if (password.length < 8) {
+                alert('Password must be at least 8 characters long');
+                return;
+            }
+            
+            const addBtn = document.getElementById('addUserBtn');
+            const originalText = addBtn.textContent;
+            addBtn.disabled = true;
+            addBtn.textContent = 'Adding...';
+            
             const newUser = {
-                firstName: document.getElementById('newFirstName').value,
-                lastName: document.getElementById('newLastName').value,
-                email: document.getElementById('newEmail').value,
-                role: document.getElementById('newRole').value,
-                password: document.getElementById('newPassword').value
+                firstName,
+                lastName,
+                email,
+                role,
+                password
             };
 
             try {
@@ -398,7 +675,16 @@
 
                 if (response.ok) {
                     const addedUser = await response.json();
-                    users.push(addedUser);
+                    // Transform API response to match frontend format
+                    const transformedUser = {
+                        id: addedUser.id,
+                        firstName: addedUser.first_name || addedUser.firstName,
+                        lastName: addedUser.last_name || addedUser.lastName,
+                        email: addedUser.email,
+                        role: addedUser.role,
+                        status: addedUser.is_active ? 'Active' : 'Inactive'
+                    };
+                    users.push(transformedUser);
                     renderUsers();
                     loadActivityLogs(document.getElementById('logFilter').value);
                     closeAddUserModal();
@@ -409,16 +695,26 @@
             } catch (error) {
                 console.error('Error adding user:', error);
                 alert('Failed to add user. Please try again.');
+            } finally {
+                addBtn.disabled = false;
+                addBtn.textContent = originalText;
             }
         }
 
         function deleteUser(userId) {
-            const user = users.find(u => u.id === userId);
+            // Convert to number if it's a string
+            const id = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+            const user = users.find(u => u.id == id || u.id === id);
             if (user) {
                 userToDelete = user;
-                document.getElementById('deleteUserName').textContent = `${user.firstName} ${user.lastName}`;
+                const firstName = user.first_name || user.firstName || '';
+                const lastName = user.last_name || user.lastName || '';
+                document.getElementById('deleteUserName').textContent = `${firstName} ${lastName}`;
                 document.getElementById('deleteModal').classList.remove('hidden');
                 document.getElementById('deleteModal').classList.add('flex');
+            } else {
+                console.error('User not found:', userId, 'Available users:', users.map(u => ({ id: u.id, type: typeof u.id })));
+                alert('User not found');
             }
         }
 
@@ -429,25 +725,56 @@
         }
 
         async function confirmDelete() {
-            if (userToDelete) {
-                try {
-                    const response = await fetch(`${API_BASE}/users/${userToDelete.id}`, {
-                        method: 'DELETE',
-                    });
+            if (!userToDelete) {
+                console.error('No user selected for deletion');
+                alert('No user selected for deletion');
+                return;
+            }
+            
+            const deleteBtn = document.querySelector('#deleteModal button[onclick="confirmDelete()"]');
+            if (!deleteBtn) {
+                console.error('Delete button not found');
+                return;
+            }
+            
+            const originalText = deleteBtn.textContent;
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = 'Deleting...';
+            
+            try {
+                const userId = userToDelete.id;
+                console.log('Deleting user with ID:', userId);
+                const response = await fetch(`${API_BASE}/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
 
-                    if (response.ok) {
-                        users = users.filter(u => u.id !== userToDelete.id);
-                        renderUsers();
-                        loadActivityLogs(document.getElementById('logFilter').value);
-                        closeDeleteModal();
-                    } else {
-                        const error = await response.json();
-                        alert(error.error || 'Failed to delete user');
+                if (response.ok) {
+                    const result = await response.json().catch(() => ({}));
+                    console.log('User deleted successfully:', result);
+                    users = users.filter(u => u.id != userId && u.id !== userId);
+                    renderUsers();
+                    loadActivityLogs(document.getElementById('logFilter').value);
+                    closeDeleteModal();
+                } else {
+                    const errorText = await response.text();
+                    let error;
+                    try {
+                        error = JSON.parse(errorText);
+                    } catch {
+                        error = { error: errorText || 'Failed to delete user' };
                     }
-                } catch (error) {
-                    console.error('Error deleting user:', error);
-                    alert('Failed to delete user. Please try again.');
+                    console.error('Delete failed:', response.status, error);
+                    alert(error.error || 'Failed to delete user');
                 }
+            } catch (error) {
+                console.error('Error deleting user:', error);
+                alert('Failed to delete user: ' + error.message);
+            } finally {
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = originalText;
             }
         }
 

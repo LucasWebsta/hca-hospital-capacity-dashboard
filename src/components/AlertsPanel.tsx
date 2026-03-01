@@ -61,7 +61,7 @@ function occupancyColor(pct: number): string {
   return '#16a34a';
 }
 
-export function AlertsPanel() {
+export function AlertsPanel({ tooltipsOn = true }: { tooltipsOn?: boolean } = {}) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [facilitiesList, setFacilitiesList] = useState<FacilityListItem[]>([]);
   const [facilitiesLive, setFacilitiesLive] = useState<Facility[]>([]);

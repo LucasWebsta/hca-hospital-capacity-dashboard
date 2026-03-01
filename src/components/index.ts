@@ -6,3 +6,4 @@ export { ForecastOccupancyChart } from './ForecastOccupancyChart';
 export { FacilitiesAtRisk } from './FacilitiesAtRisk';
 export { AlertsPanel } from './AlertsPanel';
 export { ReportsPanel } from './ReportsPanel';
+export { InfoTooltip } from './InfoTooltip';

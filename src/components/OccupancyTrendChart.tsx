@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import type { TrendPoint } from '../api';
+import { InfoTooltip } from './InfoTooltip';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -12,9 +13,11 @@ type Series = 'Overall' | 'ICU';
 interface OccupancyTrendChartProps {
   days?: number;
   facilityId?: number;
+  /** When false, the "?" hover tooltip is hidden */
+  tooltipsOn?: boolean;
 }
 
-export function OccupancyTrendChart({ days = 30, facilityId }: OccupancyTrendChartProps) {
+export function OccupancyTrendChart({ days = 30, facilityId, tooltipsOn = true }: OccupancyTrendChartProps) {
   const [activeSeries, setActiveSeries] = useState<Series>('Overall');
   const [data, setData] = useState<TrendPoint[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -43,7 +46,12 @@ export function OccupancyTrendChart({ days = 30, facilityId }: OccupancyTrendCha
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: BRAND_BLUE }}>Occupancy Trend</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: BRAND_BLUE }}>Occupancy Trend</span>
+            {tooltipsOn && (
+              <InfoTooltip text="Historical census over time. Switch between Overall (total beds) and ICU to see capacity trends. One snapshot per day per facility is used to avoid double-counting." />
+            )}
+          </div>
           <div style={{ fontSize: 11.5, color: '#94a3b8', marginTop: 2 }}>{subtitle}</div>
         </div>
 
