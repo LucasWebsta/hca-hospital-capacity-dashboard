@@ -46,6 +46,7 @@ export interface TrendPoint {
   forecast?: number;
   lower?: number;
   upper?: number;
+  occupancy_pct?: number;
 }
 
 export interface ForecastResponse {
