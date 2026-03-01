@@ -227,6 +227,66 @@ async function handleLogin(req, res) {
   });
 }
 
+// ── /api/users ───────────────────────────────────────────────────────────────
+async function handleUsers(req, res) {
+  if (req.method === 'POST') {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const { firstName, lastName, email, role, homeFacilityId } = JSON.parse(body || '{}');
+    if (!firstName || !lastName || !email || !role) {
+      return json(res, { error: 'firstName, lastName, email, and role are required' }, 400);
+    }
+    const { rows } = await pool.query(
+      `INSERT INTO users (first_name, last_name, email, role, home_facility_id, password_hash, is_active)
+       VALUES ($1, $2, $3, $4, $5, 'Demo1234!', true)
+       RETURNING id, first_name, last_name, email, role, home_facility_id, is_active, created_at`,
+      [firstName, lastName, email, role, homeFacilityId || null]
+    );
+    return json(res, rows[0], 201);
+  }
+  // GET
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name, email, role, home_facility_id, photo_url, is_active, created_at
+     FROM users ORDER BY id`
+  );
+  json(res, rows);
+}
+
+// ── /api/users/:id ───────────────────────────────────────────────────────────
+async function handleUserById(req, res, id) {
+  if (req.method === 'DELETE') {
+    await pool.query('DELETE FROM users WHERE id = $1', [id]);
+    return json(res, { success: true });
+  }
+  json(res, { error: 'Method not allowed' }, 405);
+}
+
+// ── /api/activity ─────────────────────────────────────────────────────────────
+async function handleActivity(req, res, searchParams) {
+  const limit = parseInt(searchParams.get('limit') ?? '50', 10);
+  const action = searchParams.get('action');
+  const params = [limit];
+  let where = '';
+  if (action && action !== 'all') {
+    where = 'WHERE action = $2';
+    params.push(action);
+  }
+  const { rows } = await pool.query(
+    `SELECT id, user_id, user_name, action, timestamp, ip_address, user_agent
+     FROM activity_logs
+     ${where}
+     ORDER BY timestamp DESC
+     LIMIT $1`,
+    params
+  );
+  json(res, rows);
+}
+
+// ── /api/auth/logout ──────────────────────────────────────────────────────────
+function handleLogout(res) {
+  json(res, { success: true });
+}
+
 // ── /api/forecast ─────────────────────────────────────────────────────────────
 async function handleForecast(res, days = 7) {
   const { rows } = await pool.query(`
@@ -261,6 +321,10 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (path === '/auth/login' && req.method === 'POST') return await handleLogin(req, res);
+    if (path === '/auth/logout' && req.method === 'POST') return handleLogout(res);
+    if (path === '/users' && (req.method === 'GET' || req.method === 'POST')) return await handleUsers(req, res);
+    if (/^\/users\/\d+$/.test(path)) return await handleUserById(req, res, path.split('/')[2]);
+    if (path === '/activity') return await handleActivity(req, res, url.searchParams);
     if (path === '/census')     return await handleCensus(res);
     if (path === '/facilities') return await handleFacilities(res);
     if (path === '/alerts')     return await handleAlerts(res);
@@ -275,5 +339,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n✅  API server running at http://localhost:${PORT}/api`);
-  console.log('   /census  /facilities  /alerts  /trend?days=N  /forecast?days=N  POST /auth/login\n');
+  console.log('   /census  /facilities  /alerts  /trend?days=N  /forecast?days=N  POST /auth/login  /users  /activity\n');
 });
