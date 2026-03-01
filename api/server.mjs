@@ -195,7 +195,7 @@ async function handleLogin(req, res) {
   }
 
   const { rows } = await pool.query(
-    `SELECT id, first_name, last_name, email, role, photo_url
+    `SELECT id, first_name, last_name, email, role, photo_url, password_hash
      FROM users
      WHERE LOWER(email) = LOWER($1) AND is_active = true`,
     [email]
@@ -206,8 +206,13 @@ async function handleLogin(req, res) {
   }
 
   const user = rows[0];
-  // Demo: accept any non-empty password (hashes in DB are placeholder values)
-  const canAccessAdmin = ['Regional Manager', 'Facility Administrator'].includes(user.role);
+
+  // Plain-text password check (demo — hashes are stored as plaintext)
+  if (user.password_hash !== password) {
+    return json(res, { error: 'Invalid email or password' }, 401);
+  }
+
+  const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role);
 
   return json(res, {
     user: {
