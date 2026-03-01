@@ -1,9 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { Camera, X, Save, Edit2 } from 'lucide-react';
+import { api } from '../api';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
 const BRAND_ORANGE = '#E75925';
+
+/** Format US-style: (555) 123-4567 or 1 (555) 123-4567. Returns original if not 10/11 digits. */
+function formatPhoneDisplay(raw: string): string {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits[0] === '1') {
+    return `1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  return raw;
+}
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -28,7 +41,8 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
   const [firstName, setFirstName] = useState(sessionUser?.firstName ?? 'User');
   const [lastName, setLastName] = useState(sessionUser?.lastName ?? '');
   const [role] = useState(sessionUser?.role ?? '');
-  const [email] = useState(sessionUser?.email ?? '');
+  const [email, setEmail] = useState(sessionUser?.email ?? '');
+  const [phoneNumber, setPhoneNumber] = useState(() => sessionUser?.phoneNumber ?? (sessionUser as { phone_number?: string })?.phone_number ?? '');
   const [facilities, setFacilities] = useState<FacilityOption[]>([]);
   const [homeLocation, setHomeLocation] = useState<string>(
     () => localStorage.getItem('homeLocation') ?? 'all'
@@ -51,8 +65,23 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
   }, []);
 
   useEffect(() => {
-    if (isOpen) document.body.style.overflow = 'hidden';
-    else { document.body.style.overflow = ''; setIsEditing(false); }
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      // Re-read session user when opening so we show latest (e.g. after re-login with phone_number)
+      try {
+        const raw = sessionStorage.getItem('user');
+        const u = raw ? JSON.parse(raw) : null;
+        if (u) {
+          setEmail(u.email ?? '');
+          setPhoneNumber(u.phoneNumber ?? u.phone_number ?? '');
+        }
+      } catch {
+        // ignore
+      }
+    } else {
+      document.body.style.overflow = '';
+      setIsEditing(false);
+    }
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
@@ -68,13 +97,35 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
     reader.readAsDataURL(file);
   }
 
-  function handleSave() {
+  async function handleSave() {
+    const userId = sessionUser?.id != null ? Number(sessionUser.id) : null;
+    if (userId != null && !Number.isNaN(userId) && (email.trim() !== (sessionUser?.email ?? '') || phoneNumber.trim() !== (sessionUser?.phoneNumber ?? (sessionUser as { phone_number?: string })?.phone_number ?? ''))) {
+      try {
+        const updated = await api.updateMyProfile(userId, {
+          email: email.trim() || undefined,
+          phoneNumber: phoneNumber.trim() || null,
+        });
+        try {
+          const raw = sessionStorage.getItem('user');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (updated.email !== undefined) u.email = updated.email;
+            if (updated.phoneNumber !== undefined) u.phoneNumber = updated.phoneNumber;
+            sessionStorage.setItem('user', JSON.stringify(u));
+          }
+        } catch {
+          // ignore
+        }
+      } catch (err) {
+        console.error('Failed to save profile:', err);
+        return;
+      }
+    }
     localStorage.setItem('homeLocation', homeLocation);
     localStorage.setItem('notifEmail', String(notifications.email));
     localStorage.setItem('notifPush',  String(notifications.push));
     localStorage.setItem('notifSms',   String(notifications.sms));
     setIsEditing(false);
-    // update the active dashboard filter to reflect the new home hospital
     if (onFacilityChange) {
       if (homeLocation === 'all') {
         onFacilityChange(null, 'All Facilities');
@@ -89,6 +140,8 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
   function handleCancel() {
     setFirstName(sessionUser?.firstName ?? 'User');
     setLastName(sessionUser?.lastName ?? '');
+    setEmail(sessionUser?.email ?? '');
+    setPhoneNumber(sessionUser?.phoneNumber ?? (sessionUser as { phone_number?: string })?.phone_number ?? '');
     setHomeLocation(localStorage.getItem('homeLocation') ?? 'all');
     setNotifications({
       email: localStorage.getItem('notifEmail') !== 'false',
@@ -203,7 +256,6 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>{firstName} {lastName}</div>
                 <div style={{ fontSize: 12, color: '#64748b', marginTop: 3 }}>{role}</div>
-                {email && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{email}</div>}
               </div>
             )}
 
@@ -219,7 +271,7 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
               }}
             >
               <Edit2 size={12} />
-              {isEditing ? 'Cancel Edit' : 'Edit Name'}
+              {isEditing ? 'Cancel Edit' : 'Edit Profile'}
             </button>
 
             {/* Role badge */}
@@ -229,6 +281,32 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
             }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Role</div>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: BRAND_BLUE }}>{role || '—'}</div>
+            </div>
+
+            {/* Email — show as editable in edit mode, read-only otherwise */}
+            <div style={{
+              width: '100%', padding: '10px 12px',
+              background: '#f8fafc', borderRadius: 8, border: '1px solid #edf0f5',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Email</div>
+              {isEditing ? (
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} style={{ ...inputStyle, margin: 0 }} placeholder="email@example.com" />
+              ) : (
+                <div style={{ fontSize: 9.5, fontWeight: 500, color: '#475569', wordBreak: 'break-all' }}>{email || '—'}</div>
+              )}
+            </div>
+
+            {/* Phone — show as editable in edit mode, read-only otherwise */}
+            <div style={{
+              width: '100%', padding: '10px 12px',
+              background: '#f8fafc', borderRadius: 8, border: '1px solid #edf0f5',
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Phone</div>
+              {isEditing ? (
+                <input type="tel" value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} style={{ ...inputStyle, margin: 0 }} placeholder="(555) 123-4567" />
+              ) : (
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#475569' }}>{phoneNumber ? formatPhoneDisplay(phoneNumber) : '—'}</div>
+              )}
             </div>
 
             {/* Home hospital badge */}
@@ -263,7 +341,6 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
             <Section label="Notification Preferences" description="Choose how you receive alerts and updates.">
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <Toggle label="Email notifications" checked={notifications.email} onChange={v => setNotifications(n => ({ ...n, email: v }))} />
-                <Toggle label="Push notifications"  checked={notifications.push}  onChange={v => setNotifications(n => ({ ...n, push: v }))} />
                 <Toggle label="SMS alerts"          checked={notifications.sms}   onChange={v => setNotifications(n => ({ ...n, sms: v }))} />
               </div>
             </Section>

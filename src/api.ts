@@ -131,7 +131,15 @@ export interface ReportSnapshot {
 export const api = {
   getCensusMetrics: (facilityId?: number) => get<CensusMetrics>(facilityId ? `/census?facility_id=${facilityId}` : '/census'),
   getFacilities:    (facilityId?: number) => get<Facility[]>(facilityId ? `/facilities?facility_id=${facilityId}` : '/facilities'),
-  getAlerts:        () => get<Alert[]>('/alerts'),
+  getAlerts: () => {
+    const uid = getCurrentUserId();
+    const headers: Record<string, string> = {};
+    if (uid != null) headers['X-User-Id'] = String(uid);
+    return fetch(`${BASE}/alerts`, { headers }).then(async (r) => {
+      if (!r.ok) throw new Error(`API error ${r.status}`);
+      return r.json() as Promise<Alert[]>;
+    });
+  },
   getTrend:         (days = 30, facilityId?: number, series: 'overall' | 'icu' = 'overall') =>
     get<TrendPoint[]>(`/trend?days=${days}&series=${series}${facilityId ? `&facility_id=${facilityId}` : ''}`),
   getForecast:      (days = 7, facilityId?: number)  => get<ForecastResponse>(`/forecast?days=${days}${facilityId ? `&facility_id=${facilityId}` : ''}`),
@@ -187,4 +195,26 @@ export const api = {
       return r.json() as Promise<{ id: string; created_at: string }>;
     });
   },
+
+  /** Update current user's default date range (7, 14, 30, or 60 days). Persists to users.default_trend_days. */
+  updateMyDefaultTrendDays: (userId: number, defaultTrendDays: number) =>
+    fetch(`${BASE}/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, defaultTrendDays }),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ defaultTrendDays: number }>;
+    }),
+
+  /** Update current user's email and/or phone. Persists to users table. */
+  updateMyProfile: (userId: number, data: { email?: string; phoneNumber?: string | null }) =>
+    fetch(`${BASE}/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...data }),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ email?: string; phoneNumber?: string | null }>;
+    }),
 };

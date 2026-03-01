@@ -33,6 +33,15 @@ function json(res, data, status = 200) {
   res.end(body);
 }
 
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => { try { resolve(JSON.parse(data || '{}')); } catch (e) { reject(e); } });
+    req.on('error', reject);
+  });
+}
+
 // ── /api/census ──────────────────────────────────────────────────────────────
 async function handleCensus(res, facilityId = null) {
   if (facilityId) {
@@ -130,8 +139,9 @@ async function handleFacilities(res, facilityId = null) {
 }
 
 // ── /api/alerts ───────────────────────────────────────────────────────────────
-async function handleAlerts(res) {
-  const { rows } = await pool.query(`
+async function handleAlerts(res, userId = null) {
+  // 1. System-level threshold alerts
+  const { rows: systemRows } = await pool.query(`
     WITH latest AS (
       SELECT DISTINCT ON (fm.facility_id)
         fm.facility_id, fm.metric_value AS census
@@ -141,8 +151,9 @@ async function handleAlerts(res) {
     ),
     occ AS (
       SELECT
-        f.id, f.name,
-        ROUND((l.census::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS occupancy_pct
+        f.facility_id AS id, f.name,
+        ROUND((l.census::numeric / NULLIF(f.capacity, 0)) * 100, 1) AS occupancy_pct,
+        f.capacity
       FROM facilities f
       JOIN latest l ON l.facility_id = f.facility_id
     )
@@ -161,12 +172,121 @@ async function handleAlerts(res) {
         WHEN occupancy_pct >= 75 THEN name || ' approaching threshold (' || occupancy_pct || '%)'
         ELSE name || ' operating normally (' || occupancy_pct || '%)'
       END AS message,
-      NOW() AS triggered_at, TRUE AS is_active
+      NOW() AS triggered_at, TRUE AS is_active, 'system' AS source
     FROM occ
     WHERE occupancy_pct >= 75
     ORDER BY occupancy_pct DESC
   `);
+
+  // 2. User rule alerts
+  const userRows = [];
+  if (userId) {
+    const { rows: rules } = await pool.query(
+      `SELECT ar.id, ar.facility_id, f.name AS facility_name, ar.metric,
+              ar.condition_type, ar.threshold_pct, ar.operator,
+              ar.value_number, ar.window_minutes, f.capacity
+       FROM alert_rules ar
+       JOIN facilities f ON f.facility_id = ar.facility_id
+       WHERE ar.user_id = $1`,
+      [userId]
+    );
+    for (const rule of rules) {
+      try {
+        if (rule.condition_type === 'percent_occupancy' && rule.threshold_pct != null) {
+          const { rows: mv } = await pool.query(
+            `SELECT metric_value FROM facility_metrics
+             WHERE facility_id = $1 AND LOWER(metric) IN ('total census','total','census','total beds','occupied','beds')
+             ORDER BY source_update_date DESC LIMIT 1`, [rule.facility_id]
+          );
+          if (mv.length > 0) {
+            const pct = rule.capacity > 0 ? (mv[0].metric_value / rule.capacity) * 100 : 0;
+            if (pct >= Number(rule.threshold_pct)) {
+              userRows.push({ id: rule.id * -1, hospital: rule.facility_name,
+                severity: pct >= 95 ? 'HIGH' : pct >= 85 ? 'MEDIUM' : 'LOW',
+                message: `[Your rule] ${rule.facility_name} ${rule.metric} occupancy at ${pct.toFixed(1)}% (threshold: ${rule.threshold_pct}%)`,
+                triggered_at: new Date().toISOString(), is_active: true, source: 'user_rule' });
+            }
+          }
+        } else if (rule.condition_type === 'value_threshold' && rule.operator && rule.value_number != null) {
+          const { rows: mv } = await pool.query(
+            `SELECT metric_value FROM facility_metrics
+             WHERE facility_id = $1 AND LOWER(metric) = LOWER($2)
+             ORDER BY source_update_date DESC LIMIT 1`, [rule.facility_id, rule.metric]
+          );
+          if (mv.length > 0) {
+            const val = Number(mv[0].metric_value);
+            const thr = Number(rule.value_number);
+            const triggered = (rule.operator === '>' && val > thr) || (rule.operator === '>=' && val >= thr) ||
+                              (rule.operator === '<' && val < thr) || (rule.operator === '<=' && val <= thr);
+            if (triggered) {
+              userRows.push({ id: rule.id * -1, hospital: rule.facility_name,
+                severity: 'MEDIUM',
+                message: `[Your rule] ${rule.facility_name} ${rule.metric} is ${val} (${rule.operator} ${thr})`,
+                triggered_at: new Date().toISOString(), is_active: true, source: 'user_rule' });
+            }
+          }
+        } else if (rule.condition_type === 'surge_trend') {
+          const { rows: mv } = await pool.query(
+            `SELECT metric_value FROM facility_metrics
+             WHERE facility_id = $1 AND LOWER(metric) = LOWER($2)
+             ORDER BY source_update_date DESC LIMIT 2`, [rule.facility_id, rule.metric]
+          );
+          if (mv.length >= 2) {
+            const latest = Number(mv[0].metric_value);
+            const prev   = Number(mv[1].metric_value);
+            const changePct = prev > 0 ? ((latest - prev) / prev) * 100 : 0;
+            if (changePct >= 5) {
+              userRows.push({ id: rule.id * -1, hospital: rule.facility_name,
+                severity: changePct >= 15 ? 'HIGH' : 'MEDIUM',
+                message: `[Your rule] ${rule.facility_name} ${rule.metric} surged ${changePct.toFixed(1)}% recently`,
+                triggered_at: new Date().toISOString(), is_active: true, source: 'user_rule' });
+            }
+          }
+        }
+      } catch (e) { console.warn('  rule eval error:', e.message); }
+    }
+  }
+  json(res, [...systemRows, ...userRows]);
+}
+
+// ── /api/alertRules ───────────────────────────────────────────────────────────
+async function handleAlertRulesGet(res, userId) {
+  if (!userId) return json(res, []);
+  const { rows } = await pool.query(
+    `SELECT ar.id, ar.facility_id AS hospital_id, f.name AS facility_name, ar.metric,
+            ar.condition_type, ar.threshold_pct, ar.operator, ar.value_number,
+            ar.window_minutes, ar.created_at
+     FROM alert_rules ar
+     JOIN facilities f ON f.facility_id = ar.facility_id
+     WHERE ar.user_id = $1
+     ORDER BY ar.created_at DESC`,
+    [userId]
+  );
   json(res, rows);
+}
+
+async function handleAlertRulesPost(req, res, userId) {
+  if (!userId) return json(res, { error: 'Login required to create alert rules' }, 401);
+  const body = await readBody(req);
+  const { hospital_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes } = body;
+  if (!hospital_id || !metric || !condition_type)
+    return json(res, { error: 'hospital_id, metric, condition_type required' }, 400);
+  const { rows } = await pool.query(
+    `INSERT INTO alert_rules (user_id, facility_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING id, facility_id AS hospital_id, metric, condition_type, threshold_pct, operator, value_number, window_minutes, created_at`,
+    [userId, hospital_id, metric, condition_type, threshold_pct ?? null, operator ?? null, value_number ?? null, window_minutes ?? null]
+  );
+  json(res, rows[0], 201);
+}
+
+async function handleAlertRulesDelete(req, res, id, userId) {
+  if (!id)     return json(res, { error: 'id required' }, 400);
+  if (!userId) return json(res, { error: 'Login required to delete alert rules' }, 401);
+  const result = await pool.query('DELETE FROM alert_rules WHERE id = $1 AND user_id = $2', [id, userId]);
+  if ((result.rowCount ?? 0) === 0) return json(res, { error: 'Alert rule not found or not owned by you' }, 404);
+  res.writeHead(204, { 'Access-Control-Allow-Origin': '*' });
+  res.end();
 }
 
 // ── /api/trend ────────────────────────────────────────────────────────────────
@@ -248,7 +368,41 @@ async function handleLogin(req, res) {
     [email]
   );
 
+  // Log failed login attempt if user not found
   if (rows.length === 0) {
+    try {
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+      // Store attempted credentials in user_name field: "email:password"
+      const attemptedCredentials = `${email}:${password}`;
+      
+      // Try to insert with 'failed_login' action first
+      try {
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES (NULL, $1, 'failed_login', $2, $3)`,
+          [attemptedCredentials, ipAddress, userAgent]
+        );
+        console.log('✅ Failed login attempt logged successfully with action=failed_login');
+      } catch (constraintError) {
+        // If constraint error, fall back to old format (action='signin' with FAILED_LOGIN: prefix)
+        if (constraintError.message && constraintError.message.includes('check constraint')) {
+          console.warn('⚠️  Constraint error - using fallback format. Run db/update_failed_login_constraint.sql to fix.');
+          const fallbackCredentials = `FAILED_LOGIN: ${attemptedCredentials}`;
+          await pool.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+             VALUES (NULL, $1, 'signin', $2, $3)`,
+            [fallbackCredentials, ipAddress, userAgent]
+          );
+          console.log('✅ Failed login attempt logged with fallback format (action=signin)');
+        } else {
+          throw constraintError; // Re-throw if it's not a constraint error
+        }
+      }
+    } catch (logError) {
+      console.error('❌ Failed to log failed login attempt:', logError.message);
+      console.error('Full error:', logError);
+    }
     return json(res, { error: 'Invalid email or password' }, 401);
   }
 
@@ -256,7 +410,57 @@ async function handleLogin(req, res) {
 
   // Plain-text password check (demo — hashes are stored as plaintext)
   if (user.password_hash !== password) {
+    // Log failed login attempt for wrong password
+    try {
+      const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+      const userAgent = req.headers['user-agent'] || 'unknown';
+      // Store attempted credentials in user_name field: "email:password"
+      const attemptedCredentials = `${email}:${password}`;
+      
+      // Try to insert with 'failed_login' action first
+      try {
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES ($1, $2, 'failed_login', $3, $4)`,
+          [user.id, attemptedCredentials, ipAddress, userAgent]
+        );
+        console.log('✅ Failed login attempt logged successfully with action=failed_login');
+      } catch (constraintError) {
+        // If constraint error, fall back to old format (action='signin' with FAILED_LOGIN: prefix)
+        if (constraintError.message && constraintError.message.includes('check constraint')) {
+          console.warn('⚠️  Constraint error - using fallback format. Run db/update_failed_login_constraint.sql to fix.');
+          const fallbackCredentials = `FAILED_LOGIN: ${attemptedCredentials}`;
+          await pool.query(
+            `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+             VALUES ($1, $2, 'signin', $3, $4)`,
+            [user.id, fallbackCredentials, ipAddress, userAgent]
+          );
+          console.log('✅ Failed login attempt logged with fallback format (action=signin)');
+        } else {
+          throw constraintError; // Re-throw if it's not a constraint error
+        }
+      }
+    } catch (logError) {
+      console.error('❌ Failed to log failed login attempt:', logError.message);
+      console.error('Full error:', logError);
+    }
     return json(res, { error: 'Invalid email or password' }, 401);
+  }
+
+  // Log sign-in activity
+  try {
+    const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    const userName = `${user.first_name} ${user.last_name}`;
+    
+    await pool.query(
+      `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+       VALUES ($1, $2, 'signin', $3, $4)`,
+      [user.id, userName, ipAddress, userAgent]
+    );
+  } catch (logError) {
+    // Log error but don't fail the login
+    console.error('Failed to log sign-in activity:', logError);
   }
 
   const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role);
@@ -279,15 +483,17 @@ async function handleUsers(req, res) {
   if (req.method === 'POST') {
     let body = '';
     for await (const chunk of req) body += chunk;
-    const { firstName, lastName, email, role, homeFacilityId } = JSON.parse(body || '{}');
+    const { firstName, lastName, email, role, homeFacilityId, password } = JSON.parse(body || '{}');
     if (!firstName || !lastName || !email || !role) {
       return json(res, { error: 'firstName, lastName, email, and role are required' }, 400);
     }
+    // Use provided password or default to 'Demo1234!' if not provided
+    const passwordHash = password || 'Demo1234!';
     const { rows } = await pool.query(
       `INSERT INTO users (first_name, last_name, email, role, home_facility_id, password_hash, is_active)
-       VALUES ($1, $2, $3, $4, $5, 'Demo1234!', true)
+       VALUES ($1, $2, $3, $4, $5, $6, true)
        RETURNING id, first_name, last_name, email, role, home_facility_id, is_active, created_at`,
-      [firstName, lastName, email, role, homeFacilityId || null]
+      [firstName, lastName, email, role, homeFacilityId || null, passwordHash]
     );
     return json(res, rows[0], 201);
   }
@@ -302,8 +508,23 @@ async function handleUsers(req, res) {
 // ── /api/users/:id ───────────────────────────────────────────────────────────
 async function handleUserById(req, res, id) {
   if (req.method === 'DELETE') {
-    await pool.query('DELETE FROM users WHERE id = $1', [id]);
-    return json(res, { success: true });
+    try {
+      // Preserve activity logs by setting user_id to NULL instead of deleting them
+      // This maintains audit trail even after user deletion
+      await pool.query('UPDATE activity_logs SET user_id = NULL WHERE user_id = $1', [id]);
+      
+      // Then delete the user
+      const result = await pool.query('DELETE FROM users WHERE id = $1', [id]);
+      
+      if (result.rowCount === 0) {
+        return json(res, { error: 'User not found' }, 404);
+      }
+      
+      return json(res, { success: true });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      return json(res, { error: 'Failed to delete user' }, 500);
+    }
   }
   json(res, { error: 'Method not allowed' }, 405);
 }
@@ -330,8 +551,35 @@ async function handleActivity(req, res, searchParams) {
 }
 
 // ── /api/auth/logout ──────────────────────────────────────────────────────────
-function handleLogout(res) {
-  json(res, { success: true });
+async function handleLogout(req, res) {
+  try {
+    let body = '';
+    for await (const chunk of req) body += chunk;
+    const { userId, userName } = JSON.parse(body || '{}');
+
+    // Log sign-out activity if user info is provided
+    if (userId || userName) {
+      try {
+        const ipAddress = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+        const userAgent = req.headers['user-agent'] || 'unknown';
+        
+        await pool.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent)
+           VALUES ($1, $2, 'signout', $3, $4)`,
+          [userId || null, userName || 'Unknown', ipAddress, userAgent]
+        );
+      } catch (logError) {
+        // Log error but don't fail the logout
+        console.error('Failed to log sign-out activity:', logError);
+      }
+    }
+
+    return json(res, { success: true });
+  } catch (error) {
+    console.error('Logout error:', error);
+    // Still return success even if logging fails
+    return json(res, { success: true });
+  }
 }
 
 // ── /api/forecast ─────────────────────────────────────────────────────────────
@@ -386,7 +634,7 @@ async function handleForecast(res, days = 7, facilityId = null) {
 // ── Router ────────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': 'Content-Type' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' });
     res.end();
     return;
   }
@@ -395,21 +643,28 @@ const server = http.createServer(async (req, res) => {
   const path = url.pathname.replace(/^\/api/, '');
   const days = parseInt(url.searchParams.get('days') ?? '30', 10);
   const facilityId = url.searchParams.get('facility_id') ? parseInt(url.searchParams.get('facility_id'), 10) : null;
+  const userId = req.headers['x-user-id'] ?? null;
 
   console.log(`[${new Date().toLocaleTimeString()}] ${req.method} ${url.pathname}`);
 
   try {
     if (path === '/auth/login' && req.method === 'POST') return await handleLogin(req, res);
-    if (path === '/auth/logout' && req.method === 'POST') return handleLogout(res);
+    if (path === '/auth/logout' && req.method === 'POST') return await handleLogout(req, res);
     if (path === '/users' && (req.method === 'GET' || req.method === 'POST')) return await handleUsers(req, res);
     if (/^\/users\/\d+$/.test(path)) return await handleUserById(req, res, path.split('/')[2]);
     if (path === '/activity') return await handleActivity(req, res, url.searchParams);
     if (path === '/census')          return await handleCensus(res, facilityId);
     if (path === '/facilitiesList')  return await handleFacilitiesList(res);
     if (path === '/facilities')      return await handleFacilities(res, facilityId);
-    if (path === '/alerts')          return await handleAlerts(res);
+    if (path === '/alerts')          return await handleAlerts(res, userId);
     if (path === '/trend')           return await handleTrend(res, days, facilityId);
     if (path === '/forecast')        return await handleForecast(res, days, facilityId);
+    if (path === '/alertRules' && req.method === 'GET')    return await handleAlertRulesGet(res, userId);
+    if (path === '/alertRulesPost' && req.method === 'POST') return await handleAlertRulesPost(req, res, userId);
+    if (path === '/alertRulesDelete' && req.method === 'DELETE') {
+      const id = url.searchParams.get('id');
+      return await handleAlertRulesDelete(req, res, id, userId);
+    }
     json(res, { error: 'Not found' }, 404);
   } catch (err) {
     console.error(`  ERROR [${path}]:`, err.message);

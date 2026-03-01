@@ -53,7 +53,7 @@ const server = http.createServer(async (req, res) => {
   const query = parseQuery(url);
 
   if (method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' });
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' });
     res.end();
     return;
   }
@@ -69,7 +69,7 @@ const server = http.createServer(async (req, res) => {
         const { email, password } = body;
         if (!email || !password) return send(res, 400, { error: 'Email and password are required' });
         const { rows } = await db.query(
-          `SELECT id, first_name, last_name, email, role, password_hash FROM users WHERE email = $1`,
+          `SELECT id, first_name, last_name, email, role, photo_url, phone_number, default_trend_days, password_hash FROM users WHERE email = $1`,
           [email.toLowerCase()]
         );
         if (rows.length === 0) {
@@ -93,7 +93,7 @@ const server = http.createServer(async (req, res) => {
         } catch (_) { /* table may not exist or different schema */ }
         const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role || '');
         return send(res, 200, {
-          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role },
+          user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role, photoUrl: user.photo_url || null, phoneNumber: user.phone_number || null, defaultTrendDays: user.default_trend_days != null ? user.default_trend_days : 30 },
           canAccessAdmin,
         });
       } catch (err) {
@@ -155,6 +155,65 @@ const server = http.createServer(async (req, res) => {
       const u = rows[0];
       await db.query(`INSERT INTO activity_logs (user_id, user_name, action) VALUES ($1, $2, 'user_added')`, [u.id, `${firstName} ${lastName}`]);
       return send(res, 201, { id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, role: u.role, status: 'Active' });
+    }
+
+    // PATCH /api/users/me — update current user (default trend days, email, phone)
+    if ((base === 'users/me' || base === 'users/me/') && method === 'PATCH') {
+      try {
+        const raw = await readBody(req);
+        const body = JSON.parse(raw || '{}');
+        const userId = body.userId != null ? Number(body.userId) : null;
+        if (userId == null || Number.isNaN(userId)) return send(res, 400, { error: 'userId is required' });
+
+        const updates = [];
+        const params = [];
+        let p = 1;
+
+        if (body.defaultTrendDays !== undefined) {
+          const allowed = [7, 14, 30, 60];
+          if (typeof body.defaultTrendDays !== 'number' || !allowed.includes(body.defaultTrendDays)) {
+            return send(res, 400, { error: 'defaultTrendDays must be 7, 14, 30, or 60' });
+          }
+          updates.push(`default_trend_days = $${p++}`);
+          params.push(body.defaultTrendDays);
+        }
+        if (body.email !== undefined) {
+          const email = String(body.email).trim().toLowerCase();
+          if (!email) return send(res, 400, { error: 'Email cannot be empty' });
+          updates.push(`email = $${p++}`);
+          params.push(email);
+        }
+        if (body.phoneNumber !== undefined) {
+          updates.push(`phone_number = $${p++}`);
+          params.push(body.phoneNumber === null || body.phoneNumber === '' ? null : String(body.phoneNumber).trim());
+        }
+
+        if (updates.length === 0) return send(res, 400, { error: 'No fields to update' });
+
+        updates.push('updated_at = NOW()');
+        params.push(userId);
+        const result = await db.query(
+          `UPDATE users SET ${updates.join(', ')} WHERE id = $${p}`,
+          params
+        );
+        const rowCount = result?.rowCount ?? 0;
+        if (rowCount === 0) return send(res, 404, { error: 'User not found' });
+
+        const out = {};
+        if (body.defaultTrendDays !== undefined) out.defaultTrendDays = body.defaultTrendDays;
+        if (body.email !== undefined) out.email = body.email.trim().toLowerCase();
+        if (body.phoneNumber !== undefined) out.phoneNumber = body.phoneNumber === null || body.phoneNumber === '' ? null : String(body.phoneNumber).trim();
+        return send(res, 200, out);
+      } catch (err) {
+        const msg = err.message || String(err);
+        console.error('PATCH users/me error:', err);
+        if (msg.includes('default_trend_days') && (msg.includes('does not exist') || msg.includes('column'))) {
+          return send(res, 503, {
+            error: 'Database missing default_trend_days column. Run: db/migration-add-user-default-trend-days.sql',
+          });
+        }
+        return send(res, 500, { error: msg || 'Internal server error' });
+      }
     }
 
     // DELETE /api/users/:id

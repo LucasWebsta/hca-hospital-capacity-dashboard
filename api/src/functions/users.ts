@@ -114,6 +114,64 @@ export async function addUserHandler(
   }
 }
 
+// PATCH /api/users/me — update current user's default trend days (date filter)
+export async function updateMyPreferencesHandler(
+  request: HttpRequest,
+  context: InvocationContext
+): Promise<HttpResponseInit> {
+  if (request.method === 'OPTIONS') {
+    return { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'PATCH, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' } };
+  }
+  try {
+    const body = await request.json() as { userId?: number; defaultTrendDays?: number };
+    const { userId, defaultTrendDays } = body;
+
+    if (userId == null) {
+      return {
+        status: 400,
+        jsonBody: { error: 'userId is required' },
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      };
+    }
+
+    const allowed = [7, 14, 30, 60];
+    if (typeof defaultTrendDays !== 'number' || !allowed.includes(defaultTrendDays)) {
+      return {
+        status: 400,
+        jsonBody: { error: 'defaultTrendDays must be 7, 14, 30, or 60' },
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      };
+    }
+
+    const db = getDb();
+    const { rowCount } = await db.query(
+      'UPDATE users SET default_trend_days = $1, updated_at = NOW() WHERE id = $2',
+      [defaultTrendDays, userId]
+    );
+
+    if (rowCount === 0) {
+      return {
+        status: 404,
+        jsonBody: { error: 'User not found' },
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      };
+    }
+
+    return {
+      status: 200,
+      jsonBody: { defaultTrendDays },
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    };
+  } catch (err) {
+    context.error('PATCH users/me error:', err);
+    return {
+      status: 500,
+      jsonBody: { error: 'Internal server error' },
+      headers: { 'Access-Control-Allow-Origin': '*' },
+    };
+  }
+}
+
 // DELETE /api/users/:id
 export async function deleteUserHandler(
   request: HttpRequest,
@@ -181,6 +239,13 @@ app.http('users', {
     if (req.method === 'POST') return addUserHandler(req, ctx);
     return { status: 405, jsonBody: { error: 'Method not allowed' } };
   },
+});
+
+app.http('users-me', {
+  methods: ['PATCH', 'OPTIONS'],
+  authLevel: 'anonymous',
+  route: 'users/me',
+  handler: updateMyPreferencesHandler,
 });
 
 app.http('users-delete', {
