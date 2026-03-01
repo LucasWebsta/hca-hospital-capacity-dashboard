@@ -202,6 +202,7 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
                 <img
                   src={profilePicture}
                   alt="Profile"
+                  referrerPolicy="no-referrer"
                   style={{ width: 90, height: 90, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${BRAND_ORANGE}` }}
                 />
               ) : (

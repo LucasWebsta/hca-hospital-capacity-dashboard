@@ -178,22 +178,32 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
           onClick={() => setIsProfileModalOpen(true)}
           style={{
             width: 32, height: 32, borderRadius: '50%',
-            background: BRAND_ORANGE,
+            background: sessionUser?.photoUrl ? 'transparent' : BRAND_ORANGE,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
-            boxShadow: `0 1px 6px rgba(231,89,37,0.4)`,
+            boxShadow: sessionUser?.photoUrl ? 'none' : `0 1px 6px rgba(231,89,37,0.4)`,
             transition: 'transform 0.2s, box-shadow 0.2s',
+            overflow: 'hidden',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = 'scale(1.1)';
-            e.currentTarget.style.boxShadow = `0 2px 8px rgba(231,89,37,0.6)`;
+            if (!sessionUser?.photoUrl) {
+              e.currentTarget.style.boxShadow = `0 2px 8px rgba(231,89,37,0.6)`;
+            }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = `0 1px 6px rgba(231,89,37,0.4)`;
+            if (!sessionUser?.photoUrl) {
+              e.currentTarget.style.boxShadow = `0 1px 6px rgba(231,89,37,0.4)`;
+            }
           }}
           title="View Profile"
-        >{initials}</div>
+        >
+          {sessionUser?.photoUrl
+            ? <img src={sessionUser.photoUrl} alt={`${sessionUser.firstName} ${sessionUser.lastName}`} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : initials
+          }
+        </div>
       </div>
 
       {/* Profile Modal */}
