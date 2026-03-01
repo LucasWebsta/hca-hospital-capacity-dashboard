@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 import type { ForecastResponse } from '../api';
+import { InfoTooltip } from './InfoTooltip';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -9,7 +10,7 @@ const BRAND_ORANGE = '#E75925';
 
 type Days = '7' | '14' | '30' | '60';
 
-export function ForecastOccupancyChart({ facilityId }: { facilityId?: number }) {
+export function ForecastOccupancyChart({ facilityId, tooltipsOn = true }: { facilityId?: number; tooltipsOn?: boolean }) {
   const [days, setDays] = useState<Days>('7');
   const [chartData, setChartData] = useState<{ d: string; val: number; lo: number; hi: number }[]>([]);
   const [stats, setStats] = useState({ mae: 5.8, rmse: 8.2, accuracy: 92.1, upliftPct: 2.6 });
@@ -34,7 +35,12 @@ export function ForecastOccupancyChart({ facilityId }: { facilityId?: number }) 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <div>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Forecast Occupancy</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 13.5, fontWeight: 700, color: BRAND_BLUE }}>Forecast Occupancy</span>
+            {tooltipsOn && (
+              <InfoTooltip text="Predicted census for the next 7–60 days with a 95% confidence band. MAE and RMSE show model accuracy. Use this for capacity and staffing planning." />
+            )}
+          </div>
           <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 1 }}>Predictive model · CI 95%</div>
         </div>
         <div style={{ display: 'flex', gap: 3, background: '#f8fafc', borderRadius: 7, padding: 3, border: '1px solid #edf0f5' }}>
