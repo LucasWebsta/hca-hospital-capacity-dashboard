@@ -364,7 +364,9 @@ async function handleActivity(res, action = 'all', limit = 50) {
     query += ` ORDER BY timestamp DESC LIMIT $${params.length + 1}`;
     params.push(limit);
     
+    console.log(`[ACTIVITY] Query: ${query}, Params:`, params);
     const { rows } = await pool.query(query, params);
+    console.log(`[ACTIVITY] Found ${rows.length} logs`);
     
     const logs = rows.map(row => ({
       id: row.id,
@@ -378,10 +380,12 @@ async function handleActivity(res, action = 'all', limit = 50) {
   } catch (err) {
     // If activity_logs table doesn't exist, return empty array
     if (err.message.includes('does not exist')) {
-      console.warn('Activity logs table does not exist. Please run users_schema.sql in your database.');
+      console.error('[ACTIVITY ERROR] Activity logs table does not exist:', err.message);
+      console.warn('[ACTIVITY] Please run users_schema.sql in your database.');
       json(res, []);
     } else {
-      console.error('Get activity logs error:', err);
+      console.error('[ACTIVITY ERROR] Get activity logs error:', err);
+      console.error('[ACTIVITY ERROR] Full error:', err);
       json(res, { error: 'Internal server error' }, 500);
     }
   }
@@ -404,9 +408,11 @@ async function handleLogin(res, body) {
       WHERE email = $1
     `;
     
+    console.log(`[LOGIN] Attempting login for email: ${email.toLowerCase()}`);
     const { rows } = await pool.query(query, [email.toLowerCase()]);
     
     if (rows.length === 0) {
+      console.log(`[LOGIN] User not found: ${email}`);
       // Log failed login attempt
       try {
         await pool.query(`
@@ -415,6 +421,7 @@ async function handleLogin(res, body) {
         `, [email]);
       } catch (err) {
         // Activity logs table might not exist
+        console.warn('[LOGIN] Could not log failed attempt:', err.message);
       }
       
       json(res, { error: 'Invalid email or password' }, 401);
@@ -422,9 +429,11 @@ async function handleLogin(res, body) {
     }
     
     const user = rows[0];
+    console.log(`[LOGIN] User found: ${user.first_name} ${user.last_name} (ID: ${user.id})`);
     
     // Check password (simple comparison for demo)
     if (user.password_hash !== password) {
+      console.log(`[LOGIN] Password mismatch for user: ${user.email}`);
       // Log failed login attempt
       try {
         await pool.query(`
@@ -433,24 +442,35 @@ async function handleLogin(res, body) {
         `, [email]);
       } catch (err) {
         // Activity logs table might not exist
+        console.warn('[LOGIN] Could not log failed attempt:', err.message);
       }
       
       json(res, { error: 'Invalid email or password' }, 401);
       return;
     }
     
+    console.log(`[LOGIN] Password verified for user: ${user.email}`);
+    
     // Check if user is Kevin - only Kevin can access admin page
     const firstName = user.first_name.toLowerCase();
     const isKevin = firstName === 'kevin';
     
-    // Log successful login
+    // Log successful login for ALL users (including admin/Kevin)
     try {
-      await pool.query(`
+      const result = await pool.query(`
         INSERT INTO activity_logs (user_id, user_name, action)
         VALUES ($1, $2, 'signin')
+        RETURNING id
       `, [user.id, `${user.first_name} ${user.last_name}`]);
+      console.log(`[LOGIN] User logged in: ${user.first_name} ${user.last_name} (ID: ${user.id}, Log ID: ${result.rows[0]?.id})`);
     } catch (err) {
-      // Activity logs table might not exist
+      // Activity logs table might not exist, but log to console
+      console.error('[LOGIN ERROR] Could not log login to activity_logs:', err.message);
+      console.error('[LOGIN ERROR] Full error:', err);
+      // Try to create the table if it doesn't exist (for development)
+      if (err.message.includes('does not exist')) {
+        console.warn('[LOGIN] Activity logs table does not exist. Please run users_schema.sql in your database.');
+      }
     }
     
     // Return user data with admin access flag
@@ -475,16 +495,37 @@ async function handleLogout(res, body) {
   try {
     const { userId, userName } = body || {};
     
-    // Log logout if user info provided
+    // Log logout for ALL users (including admin/Kevin) - always log if we have any user info
     if (userId || userName) {
       try {
-        await pool.query(`
+        const result = await pool.query(`
           INSERT INTO activity_logs (user_id, user_name, action)
           VALUES ($1, $2, 'signout')
+          RETURNING id
         `, [userId || null, userName || 'Unknown']);
+        console.log(`[LOGOUT] User logged out: ${userName || 'Unknown'} (ID: ${userId || 'N/A'}, Log ID: ${result.rows[0]?.id})`);
       } catch (err) {
-        // Activity logs table might not exist
-        console.warn('Could not log logout:', err.message);
+        // Activity logs table might not exist, but log to console
+        console.error('[LOGOUT ERROR] Could not log logout to activity_logs:', err.message);
+        console.error('[LOGOUT ERROR] Full error:', err);
+        if (err.message.includes('does not exist')) {
+          console.warn('[LOGOUT] Activity logs table does not exist. Please run users_schema.sql in your database.');
+        }
+      }
+    } else {
+      // Even if no user info provided, try to log with unknown
+      try {
+        const result = await pool.query(`
+          INSERT INTO activity_logs (user_name, action)
+          VALUES ($1, 'signout')
+          RETURNING id
+        `, ['Unknown User']);
+        console.log(`[LOGOUT] Unknown user logged out (Log ID: ${result.rows[0]?.id})`);
+      } catch (err) {
+        console.error('[LOGOUT ERROR] Could not log logout to activity_logs:', err.message);
+        if (err.message.includes('does not exist')) {
+          console.warn('[LOGOUT] Activity logs table does not exist. Please run users_schema.sql in your database.');
+        }
       }
     }
     

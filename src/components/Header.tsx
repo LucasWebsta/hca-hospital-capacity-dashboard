@@ -1,4 +1,6 @@
+import { useState, useEffect } from 'react';
 import { ChevronDown, Search, Bell } from 'lucide-react';
+import { ProfileModal } from './ProfileModal';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -13,6 +15,20 @@ const pill: React.CSSProperties = {
 };
 
 export function Header() {
+  const [userInitials, setUserInitials] = useState('ST');
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  useEffect(() => {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '');
+      if (initials) {
+        setUserInitials(initials.toUpperCase());
+      }
+    }
+  }, []);
+
   return (
     <div style={{
       background: '#fff',
@@ -55,15 +71,34 @@ export function Header() {
           <Bell size={15} color={BRAND_BLUE} />
         </button>
 
-        {/* Avatar */}
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: BRAND_ORANGE,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
-          boxShadow: `0 1px 6px rgba(231,89,37,0.4)`,
-        }}>ST</div>
+        {/* Avatar - Clickable to open profile modal */}
+        <div 
+          onClick={() => setIsProfileModalOpen(true)}
+          style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: BRAND_ORANGE,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
+            boxShadow: `0 1px 6px rgba(231,89,37,0.4)`,
+            transition: 'transform 0.2s, box-shadow 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'scale(1.1)';
+            e.currentTarget.style.boxShadow = `0 2px 8px rgba(231,89,37,0.6)`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = `0 1px 6px rgba(231,89,37,0.4)`;
+          }}
+          title="View Profile"
+        >{userInitials}</div>
       </div>
+
+      {/* Profile Modal */}
+      <ProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </div>
   );
 }

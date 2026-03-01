@@ -170,8 +170,15 @@
                 // Network error or API not available - show error
                 console.error('Login error:', error);
                 console.error('API_BASE:', API_BASE);
-                alert('Cannot connect to server. Please ensure the API server is running at http://localhost:7071\n\nError: ' + error.message);
-                showLoginError();
+                
+                // Check if it's a 401 error (invalid credentials)
+                if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                    showLoginError();
+                    // Don't show alert for 401 - the visual error is enough
+                } else {
+                    alert('Cannot connect to server. Please ensure the API server is running at http://localhost:7071\n\nError: ' + error.message);
+                    showLoginError();
+                }
             });
         });
     </script>

@@ -5,25 +5,33 @@ interface ProfileModalProps {
   onClose: () => void;
 }
 
+// Get user info from sessionStorage (from login)
+const getUserInfo = () => {
+  if (typeof window !== 'undefined') {
+    const userStr = sessionStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return {
+        firstName: user.firstName || 'John',
+        lastName: user.lastName || 'Doe',
+        role: user.role || 'Executive Director',
+        email: user.email || '',
+      };
+    }
+  }
+  return {
+    firstName: typeof window !== 'undefined' ? (localStorage.getItem('userFirstName') || 'John') : 'John',
+    lastName: typeof window !== 'undefined' ? (localStorage.getItem('userLastName') || 'Doe') : 'Doe',
+    role: typeof window !== 'undefined' ? (localStorage.getItem('userRole') || 'Executive Director') : 'Executive Director',
+    email: '',
+  };
+};
+
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const [firstName, setFirstName] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userFirstName') || 'John';
-    }
-    return 'John';
-  });
-  const [lastName, setLastName] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userLastName') || 'Doe';
-    }
-    return 'Doe';
-  });
-  const [role, setRole] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('userRole') || 'Executive Director';
-    }
-    return 'Executive Director';
-  });
+  const initialUser = getUserInfo();
+  const [firstName, setFirstName] = useState(initialUser.firstName);
+  const [lastName, setLastName] = useState(initialUser.lastName);
+  const [role, setRole] = useState(initialUser.role);
   const [homeLocation, setHomeLocation] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('homeLocation') || 'all';
@@ -41,6 +49,11 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      // Refresh user info from sessionStorage when modal opens
+      const userInfo = getUserInfo();
+      setFirstName(userInfo.firstName);
+      setLastName(userInfo.lastName);
+      setRole(userInfo.role);
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -310,6 +323,47 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   className="px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg transition"
                 >
                   Cancel
+                </button>
+              </div>
+
+              {/* Logout Button */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <button
+                  onClick={async () => {
+                    const userStr = sessionStorage.getItem('user');
+                    let userId = null;
+                    let userName = 'Unknown';
+                    
+                    if (userStr) {
+                      const user = JSON.parse(userStr);
+                      userId = user.id;
+                      userName = `${user.firstName} ${user.lastName}`;
+                    }
+                    
+                    try {
+                      // Call logout API
+                      await fetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ userId, userName })
+                      });
+                    } catch (error) {
+                      console.error('Logout API error:', error);
+                      // Continue with logout even if API call fails
+                    }
+                    
+                    // Clear session storage and redirect to login
+                    sessionStorage.clear();
+                    window.location.href = '/login.html';
+                  }}
+                  className="w-full px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition shadow-sm flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Logout
                 </button>
               </div>
             </div>
