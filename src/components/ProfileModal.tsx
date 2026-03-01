@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Camera, X, Save, Edit2, LogOut } from 'lucide-react';
+import { Camera, X, Save, Edit2 } from 'lucide-react';
 
 // HCA Brand colors: Blue #092240 | Orange #E75925
 const BRAND_BLUE = '#092240';
@@ -51,19 +51,10 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-      // Refresh user info from sessionStorage when modal opens
-      if (sessionUser) {
-        setFirstName(sessionUser.firstName ?? 'User');
-        setLastName(sessionUser.lastName ?? '');
-      }
-    } else {
-      document.body.style.overflow = '';
-      setIsEditing(false);
-    }
+    if (isOpen) document.body.style.overflow = 'hidden';
+    else { document.body.style.overflow = ''; setIsEditing(false); }
     return () => { document.body.style.overflow = ''; };
-  }, [isOpen, sessionUser]);
+  }, [isOpen]);
 
   function handlePictureChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -105,36 +96,6 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
       sms:   localStorage.getItem('notifSms')   === 'true',
     });
     setIsEditing(false);
-  }
-
-  async function handleLogout() {
-    const userStr = sessionStorage.getItem('user');
-    let userId = null;
-    let userName = 'Unknown';
-    
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      userId = user.id;
-      userName = `${user.firstName} ${user.lastName}`;
-    }
-    
-    try {
-      // Call logout API
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId, userName })
-      });
-    } catch (error) {
-      console.error('Logout API error:', error);
-      // Continue with logout even if API call fails
-    }
-    
-    // Clear session storage and redirect to login
-    sessionStorage.clear();
-    window.location.href = '/login.html';
   }
 
   const initials = `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase() || 'HCA';
@@ -277,26 +238,6 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
             }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>Home Hospital</div>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: BRAND_ORANGE, lineHeight: 1.3 }}>{homeName}</div>
-            </div>
-
-            {/* Logout Button */}
-            <div style={{ width: '100%', marginTop: 12, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
-              <button
-                onClick={handleLogout}
-                style={{
-                  width: '100%', padding: '8px 0',
-                  background: '#dc2626', color: '#fff',
-                  border: 'none', borderRadius: 7, cursor: 'pointer',
-                  fontSize: 12, fontWeight: 600,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  transition: 'background 0.2s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#b91c1c'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '#dc2626'; }}
-              >
-                <LogOut size={12} />
-                Logout
-              </button>
             </div>
           </div>
 

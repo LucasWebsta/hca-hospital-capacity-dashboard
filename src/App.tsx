@@ -44,27 +44,6 @@ function App() {
     sevenDayForecast: 963,
   });
 
-  // Authentication check - redirect to login if not authenticated
-  useEffect(() => {
-    const userStr = sessionStorage.getItem('user');
-    const isAdmin = sessionStorage.getItem('isAdmin');
-    
-    // If user is Kevin (admin), redirect to admin page
-    if (userStr && isAdmin === 'true') {
-      const user = JSON.parse(userStr);
-      if (user.firstName?.toLowerCase() === 'kevin') {
-        window.location.href = '/admin.html';
-        return;
-      }
-    }
-    
-    // If not logged in, redirect to login page
-    if (!userStr) {
-      window.location.href = '/login.html';
-      return;
-    }
-  }, []);
-
   useEffect(() => {
     api
       .getCensusMetrics(selectedFacilityId ?? undefined)

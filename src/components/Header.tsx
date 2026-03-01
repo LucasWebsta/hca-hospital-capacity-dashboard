@@ -28,11 +28,18 @@ function getInitials(user: { firstName: string; lastName: string } | null): stri
   return `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
 }
 
+const TREND_DAYS: { label: string; value: number }[] = [
+  { label: 'Last 7 days', value: 7 },
+  { label: 'Last 14 days', value: 14 },
+  { label: 'Last 30 days', value: 30 },
+  { label: 'Last 60 days', value: 60 },
+];
+
 interface HeaderProps {
-  trendDays?: number;
-  onTrendDaysChange?: (days: number) => void;
-  onAlertsClick?: () => void;
-  onFacilityChange?: (facilityId: number | null, name: string) => void;
+  trendDays: number;
+  onTrendDaysChange: (days: number) => void;
+  onAlertsClick: () => void;
+  onFacilityChange: (facilityId: number | null, name: string) => void;
   selectedFacilityName?: string;
 }
 
@@ -85,32 +92,27 @@ function Dropdown({ label, options, onSelect }: {
 
 export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacilityChange, selectedFacilityName }: HeaderProps) {
   const [facilities, setFacilities] = useState<FacilityListItem[]>([]);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const sessionUser = getSessionUser();
   const initials = getInitials(sessionUser);
   const facilityLabel = selectedFacilityName ?? 'All Facilities';
 
   useEffect(() => {
-    if (onFacilityChange) {
-      api.getFacilitiesList().then(list => {
-        setFacilities(list);
-        const homeId = localStorage.getItem('homeLocation');
-        if (homeId && homeId !== 'all') {
-          const match = list.find(f => String(f.id) === homeId);
-          if (match) onFacilityChange(match.id, match.name);
-        }
-      }).catch(() => {});
-    }
-  }, [onFacilityChange]);
-
-  function handleFacilitySelect(name: string) {
-    if (onFacilityChange) {
-      if (name === 'All Facilities') {
-        onFacilityChange(null, 'All Facilities');
-      } else {
-        const match = facilities.find(f => f.name === name);
+    api.getFacilitiesList().then(list => {
+      setFacilities(list);
+      const homeId = localStorage.getItem('homeLocation');
+      if (homeId && homeId !== 'all') {
+        const match = list.find(f => String(f.id) === homeId);
         if (match) onFacilityChange(match.id, match.name);
       }
+    }).catch(() => {});
+  }, []);
+
+  function handleFacilitySelect(name: string) {
+    if (name === 'All Facilities') {
+      onFacilityChange(null, 'All Facilities');
+    } else {
+      const match = facilities.find(f => f.name === name);
+      if (match) onFacilityChange(match.id, match.name);
     }
   }
 
@@ -126,92 +128,138 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
     }}>
       {/* Left filters */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {onFacilityChange ? (
-          <Dropdown
-            label={facilityLabel}
-            options={['All Facilities', ...facilities.map(f => f.name)]}
-            onSelect={handleFacilitySelect}
-          />
-        ) : (
-          <>
-            <button style={pill}>Dashboard <ChevronDown size={13} color="#9ca3af" /></button>
-            <button style={pill}>All Hospitals <ChevronDown size={13} color="#9ca3af" /></button>
-            <button style={pill}>All Service Lines <ChevronDown size={13} color="#9ca3af" /></button>
-          </>
-        )}
+        <Dropdown
+          label={facilityLabel}
+          options={['All Facilities', ...facilities.map(f => f.name)]}
+          onSelect={handleFacilitySelect}
+        />
       </div>
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {onTrendDaysChange && trendDays !== undefined && (
-          <button style={pill}>Last {trendDays} days <ChevronDown size={13} color="#9ca3af" /></button>
-        )}
-        {!onTrendDaysChange && (
-          <>
-            <button style={pill}>Last 14 days <ChevronDown size={13} color="#9ca3af" /></button>
-            <button style={pill}>Next 7 days <ChevronDown size={13} color="#9ca3af" /></button>
-          </>
-        )}
+        <Dropdown
+          label={TREND_DAYS.find(d => d.value === trendDays)?.label ?? 'Last 30 days'}
+          options={TREND_DAYS.map(d => d.label)}
+          onSelect={(v) => {
+            const match = TREND_DAYS.find(d => d.label === v);
+            if (match) onTrendDaysChange(match.value);
+          }}
+        />
 
-        <button style={{
-          ...pill,
-          background: BRAND_BLUE,
-          color: '#fff', borderColor: 'transparent',
-          fontWeight: 600, gap: 6,
-          boxShadow: `0 2px 8px rgba(9,34,64,0.3)`,
-        }}>
-          <ChevronDown size={13} color="rgba(255,255,255,0.7)" /> Filter
-        </button>
-
-        {/* Bell */}
-        <button style={{
-          width: 34, height: 34, borderRadius: '50%',
-          background: '#f8fafc', border: '1px solid #e2e8f0',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', marginLeft: 2,
-        }}>
-          <Bell size={15} color={BRAND_BLUE} />
-        </button>
-
-        {/* Avatar - Clickable to open profile modal */}
-        <div 
-          onClick={() => setIsProfileModalOpen(true)}
+        {/* Bell → Alerts */}
+        <button
+          onClick={onAlertsClick}
+          title="View Alerts"
           style={{
-            width: 32, height: 32, borderRadius: '50%',
-            background: sessionUser?.photoUrl ? 'transparent' : BRAND_ORANGE,
+            width: 34, height: 34, borderRadius: '50%',
+            background: '#f8fafc', border: '1px solid #e2e8f0',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
-            boxShadow: sessionUser?.photoUrl ? 'none' : `0 1px 6px rgba(231,89,37,0.4)`,
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            overflow: 'hidden',
+            cursor: 'pointer', marginLeft: 2, position: 'relative',
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'scale(1.1)';
-            if (!sessionUser?.photoUrl) {
-              e.currentTarget.style.boxShadow = `0 2px 8px rgba(231,89,37,0.6)`;
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            if (!sessionUser?.photoUrl) {
-              e.currentTarget.style.boxShadow = `0 1px 6px rgba(231,89,37,0.4)`;
-            }
-          }}
-          title="View Profile"
         >
-          {sessionUser?.photoUrl
-            ? <img src={sessionUser.photoUrl} alt={`${sessionUser.firstName} ${sessionUser.lastName}`} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : initials
-          }
-        </div>
+          <Bell size={15} color={BRAND_BLUE} />
+          <span style={{
+            position: 'absolute', top: 4, right: 4,
+            width: 7, height: 7, borderRadius: '50%',
+            background: BRAND_ORANGE, border: '1.5px solid #fff',
+          }} />
+        </button>
+
+        {/* Avatar + profile dropdown */}
+        <AvatarMenu initials={initials} sessionUser={sessionUser} onFacilityChange={onFacilityChange} />
+      </div>
+    </div>
+  );
+}
+
+function AvatarMenu({ initials, sessionUser, onFacilityChange }: {
+  initials: string;
+  sessionUser: { firstName: string; lastName: string; role: string; photoUrl?: string } | null;
+  onFacilityChange: (id: number | null, name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  function handleLogout() {
+    sessionStorage.clear();
+    window.location.href = '/login.html';
+  }
+
+  const fullName = sessionUser ? `${sessionUser.firstName} ${sessionUser.lastName}` : 'User';
+  const role = sessionUser?.role ?? '';
+  const photoUrl = sessionUser?.photoUrl;
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        onClick={() => setOpen(o => !o)}
+        title={fullName}
+        style={{
+          width: 32, height: 32, borderRadius: '50%',
+          background: BRAND_BLUE, overflow: 'hidden',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 11, fontWeight: 700, color: '#fff', cursor: 'pointer',
+          boxShadow: `0 1px 6px rgba(9,34,64,0.3)`, flexShrink: 0,
+        }}
+      >
+        {photoUrl
+          ? <img src={photoUrl} alt={fullName} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          : initials
+        }
       </div>
 
-      {/* Profile Modal */}
-      <ProfileModal 
-        isOpen={isProfileModalOpen} 
-        onClose={() => setIsProfileModalOpen(false)}
-        onFacilityChange={onFacilityChange}
-      />
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 999,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.13)', minWidth: 200, padding: '6px 0',
+        }}>
+          {/* User info header */}
+          <div style={{ padding: '10px 16px 8px', borderBottom: '1px solid #f1f5f9' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{fullName}</div>
+            <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>{role}</div>
+          </div>
+
+          {/* Profile */}
+          <button
+            onClick={() => { setOpen(false); setProfileOpen(true); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '9px 16px',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 13, color: '#374151', textAlign: 'left',
+            }}
+          >
+            <User size={15} color="#6b7280" />
+            Profile
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '9px 16px',
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              fontSize: 13, color: '#dc2626', textAlign: 'left',
+            }}
+          >
+            <LogOut size={15} color="#dc2626" />
+            Sign out
+          </button>
+        </div>
+      )}
+
+      <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} onFacilityChange={onFacilityChange} />
     </div>
   );
 }

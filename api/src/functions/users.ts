@@ -189,6 +189,3 @@ app.http('users-delete', {
   route: 'users/{id?}',
   handler: deleteUserHandler,
 });
-
-// Export handlers for use in server.mjs
-export { getUsersHandler, addUserHandler, deleteUserHandler };

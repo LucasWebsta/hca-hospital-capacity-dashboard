@@ -143,6 +143,3 @@ app.http('auth-logout', {
     route: 'auth/logout',
     handler: logoutHandler,
 });
-
-// Export handlers for use in server.mjs
-export { loginHandler, logoutHandler };
