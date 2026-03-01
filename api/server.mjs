@@ -43,7 +43,7 @@ async function handleCensus(res) {
         f.capacity
       FROM facility_metrics fm
       JOIN facilities f ON f.facility_id = fm.facility_id
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
       ORDER BY fm.facility_id, fm.source_update_date DESC
     ),
     totals AS (
@@ -77,7 +77,7 @@ async function handleFacilities(res) {
       SELECT DISTINCT ON (fm.facility_id)
         fm.facility_id, fm.metric_value AS census, fm.source_update_date AS latest_ts
       FROM facility_metrics fm
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
       ORDER BY fm.facility_id, fm.source_update_date DESC
     ),
     day_ago AS (
@@ -85,7 +85,7 @@ async function handleFacilities(res) {
         fm.facility_id, fm.metric_value AS prev_census
       FROM facility_metrics fm
       JOIN latest l ON l.facility_id = fm.facility_id
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
         AND fm.source_update_date <= l.latest_ts - INTERVAL '24 hours'
       ORDER BY fm.facility_id, fm.source_update_date DESC
     )
@@ -115,7 +115,7 @@ async function handleAlerts(res) {
       SELECT DISTINCT ON (fm.facility_id)
         fm.facility_id, fm.metric_value AS census
       FROM facility_metrics fm
-      WHERE fm.metric = 'Total Census'
+      WHERE LOWER(fm.metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
       ORDER BY fm.facility_id, fm.source_update_date DESC
     ),
     occ AS (
@@ -162,9 +162,9 @@ async function handleTrend(res, days = 30) {
           DATE(source_update_date) AS d,
           AVG(metric_value)        AS avg_by_fac
         FROM facility_metrics
-        WHERE metric = 'Total Census'
+        WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
           AND source_update_date >= (
-            SELECT MAX(source_update_date) FROM facility_metrics WHERE metric = 'Total Census'
+            SELECT MAX(source_update_date) FROM facility_metrics WHERE LOWER(metric) IN ('total census', 'total', 'census', 'total beds', 'occupied', 'beds')
           ) - ($1 || ' days')::INTERVAL
         GROUP BY facility_id, DATE(source_update_date)
       ) sub

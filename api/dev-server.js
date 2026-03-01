@@ -52,8 +52,111 @@ const server = http.createServer(async (req, res) => {
   const base = p.startsWith('api/') ? p.slice(4) : p;
   const query = parseQuery(url);
 
+  if (method === 'OPTIONS') {
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+    res.end();
+    return;
+  }
+
   try {
     const db = getDb();
+
+    // POST /api/auth/login
+    if (base === 'auth/login' && method === 'POST') {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}');
+      const { email, password } = body;
+      if (!email || !password) return send(res, 400, { error: 'Email and password are required' });
+      const { rows } = await db.query(
+        `SELECT id, first_name, last_name, email, role, status, password_hash FROM users WHERE email = $1 AND status = 'Active'`,
+        [email.toLowerCase()]
+      );
+      if (rows.length === 0) {
+        await db.query(`INSERT INTO activity_logs (user_name, action, ip_address) VALUES ($1, 'signin', $2)`, [email, req.headers['x-forwarded-for'] || 'unknown']);
+        return send(res, 401, { error: 'Invalid email or password' });
+      }
+      const user = rows[0];
+      if (user.password_hash !== password) {
+        await db.query(`INSERT INTO activity_logs (user_name, action, ip_address) VALUES ($1, 'signin', $2)`, [email, req.headers['x-forwarded-for'] || 'unknown']);
+        return send(res, 401, { error: 'Invalid email or password' });
+      }
+      await db.query(
+        `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent) VALUES ($1, $2, 'signin', $3, $4)`,
+        [user.id, `${user.first_name} ${user.last_name}`, req.headers['x-forwarded-for'] || 'unknown', req.headers['user-agent'] || 'unknown']
+      );
+      const canAccessAdmin = (user.first_name || '').toLowerCase() === 'kevin';
+      return send(res, 200, {
+        user: { id: user.id, firstName: user.first_name, lastName: user.last_name, email: user.email, role: user.role },
+        canAccessAdmin,
+      });
+    }
+
+    // POST /api/auth/logout
+    if (base === 'auth/logout' && method === 'POST') {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}');
+      const { userId, userName } = body;
+      if (userId || userName) {
+        await db.query(
+          `INSERT INTO activity_logs (user_id, user_name, action, ip_address, user_agent) VALUES ($1, $2, 'signout', $3, $4)`,
+          [userId || null, userName || 'Unknown', req.headers['x-forwarded-for'] || 'unknown', req.headers['user-agent'] || 'unknown']
+        );
+      }
+      return send(res, 200, { message: 'Logged out successfully' });
+    }
+
+    // GET /api/activity
+    if (base === 'activity' && method === 'GET') {
+      const action = query.get('action') || 'all';
+      const limit = parseInt(query.get('limit') || '50', 10);
+      let sql = 'SELECT id, user_id, user_name, action, timestamp FROM activity_logs';
+      const params = [];
+      if (action !== 'all') {
+        sql += ' WHERE action = $1';
+        params.push(action);
+      }
+      sql += ' ORDER BY timestamp DESC LIMIT $' + (params.length + 1);
+      params.push(limit);
+      const { rows } = await db.query(sql, params);
+      const logs = (rows || []).map((r) => ({ id: r.id, userId: r.user_id, userName: r.user_name, action: r.action, timestamp: r.timestamp }));
+      return send(res, 200, logs);
+    }
+
+    // GET /api/users
+    if (base === 'users' && method === 'GET') {
+      const { rows } = await db.query('SELECT id, first_name, last_name, email, role, status, created_at FROM users ORDER BY created_at DESC');
+      const users = (rows || []).map((r) => ({ id: r.id, firstName: r.first_name, lastName: r.last_name, email: r.email, role: r.role, status: r.status, createdAt: r.created_at }));
+      return send(res, 200, users);
+    }
+
+    // POST /api/users
+    if (base === 'users' && method === 'POST') {
+      const raw = await readBody(req);
+      const body = JSON.parse(raw || '{}');
+      const { firstName, lastName, email, role, password } = body;
+      if (!firstName || !lastName || !email || !role || !password) return send(res, 400, { error: 'All fields are required' });
+      const existing = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+      if (existing.rows.length > 0) return send(res, 409, { error: 'User with this email already exists' });
+      const { rows } = await db.query(
+        `INSERT INTO users (first_name, last_name, email, password_hash, role, status) VALUES ($1, $2, $3, $4, $5, 'Active') RETURNING id, first_name, last_name, email, role, status`,
+        [firstName, lastName, email.toLowerCase(), password, role]
+      );
+      const u = rows[0];
+      await db.query(`INSERT INTO activity_logs (user_id, user_name, action) VALUES ($1, $2, 'user_added')`, [u.id, `${firstName} ${lastName}`]);
+      return send(res, 201, { id: u.id, firstName: u.first_name, lastName: u.last_name, email: u.email, role: u.role, status: u.status });
+    }
+
+    // DELETE /api/users/:id
+    if (base.startsWith('users/') && method === 'DELETE') {
+      const id = base.slice(6);
+      if (!id) return send(res, 400, { error: 'User ID is required' });
+      const { rows } = await db.query('SELECT first_name, last_name FROM users WHERE id = $1', [id]);
+      if (rows.length === 0) return send(res, 404, { error: 'User not found' });
+      const userName = `${rows[0].first_name} ${rows[0].last_name}`;
+      await db.query('DELETE FROM users WHERE id = $1', [id]);
+      await db.query(`INSERT INTO activity_logs (user_name, action) VALUES ($1, 'user_removed')`, [userName]);
+      return send(res, 200, { message: 'User deleted successfully' });
+    }
 
     // GET /api/census (facilities + facility_metrics; total from 'total'/'census'/etc. + ICU)
     if (base === 'census' && method === 'GET') {
