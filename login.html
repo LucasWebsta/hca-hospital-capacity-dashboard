@@ -147,14 +147,16 @@
                 if (!response.ok) {
                     throw new Error(data.error || `HTTP ${response.status}`);
                 }
-                if (data.user && data.canAccessAdmin) {
+                if (data.user) {
                     sessionStorage.setItem('user', JSON.stringify(data.user));
-                    sessionStorage.setItem('isAdmin', 'true');
-                    window.location.href = 'admin.html';
-                } else if (data.user) {
-                    sessionStorage.setItem('user', JSON.stringify(data.user));
-                    sessionStorage.setItem('isAdmin', 'false');
-                    window.location.href = '/';
+                    // Only Kevin goes to admin page, everyone else goes to main page
+                    if (data.user.firstName && data.user.firstName.toLowerCase() === 'kevin' && data.canAccessAdmin) {
+                        sessionStorage.setItem('isAdmin', 'true');
+                        window.location.href = 'admin.html';
+                    } else {
+                        sessionStorage.setItem('isAdmin', 'false');
+                        window.location.href = '/';
+                    }
                 } else {
                     showLoginError();
                 }
