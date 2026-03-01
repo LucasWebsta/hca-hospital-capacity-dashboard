@@ -1,22 +1,9 @@
 import type { MetricRow } from './loadData';
-
 export interface ForecastPoint {
     timestamp: Date;
     value: number;
     isForecast: boolean;
 }
-
-function linearRegression(points: { x: number; y: number }[]): { slope: number; intercept: number } {
-    const n = points.length;
-    const sumX = points.reduce((a, p) => a + p.x, 0);
-    const sumY = points.reduce((a, p) => a + p.y, 0);
-    const sumXY = points.reduce((a, p) => a + p.x * p.y, 0);
-    const sumX2 = points.reduce((a, p) => a + p.x * p.x, 0);
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    return { slope, intercept };
-}
-
 export function forecastMetric(
     rows: MetricRow[],
     orgId: number,
@@ -29,29 +16,28 @@ export function forecastMetric(
 
     if (filtered.length < 2) return [];
 
-    const base = filtered[0].timestamp.getTime();
-    const points = filtered.map(r => ({
-        x: (r.timestamp.getTime() - base) / (1000 * 60 * 15),
-        y: r.value,
-    }));
-
-    const { slope, intercept } = linearRegression(points);
-
     const historical: ForecastPoint[] = filtered.map(r => ({
         timestamp: r.timestamp,
         value: r.value,
         isForecast: false,
     }));
 
-    const lastX = points[points.length - 1].x;
     const lastTime = filtered[filtered.length - 1].timestamp.getTime();
     const stepsAhead = (hoursAhead * 60) / 15;
+    const oneDayMs = 168 * 60 * 60 * 1000;
 
     const forecast: ForecastPoint[] = [];
     for (let i = 1; i <= stepsAhead; i++) {
+        const futureTime = lastTime + i * 15 * 60 * 1000;
+        // Find the value from exactly 1 day ago
+        const targetTime = futureTime - oneDayMs;
+        const closest = filtered.reduce((prev, curr) =>
+            Math.abs(curr.timestamp.getTime() - targetTime) < Math.abs(prev.timestamp.getTime() - targetTime)
+                ? curr : prev
+        );
         forecast.push({
-            timestamp: new Date(lastTime + i * 15 * 60 * 1000),
-            value: Math.max(0, Math.round(slope * (lastX + i) + intercept)),
+            timestamp: new Date(futureTime),
+            value: closest.value,
             isForecast: true,
         });
     }

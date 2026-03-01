@@ -19,12 +19,12 @@ export async function loginHandler(
     }
 
     const db = getDb();
-    const { rows } = await db.query(
-      `SELECT id, first_name, last_name, email, role, status, password_hash
-       FROM users
-       WHERE email = $1 AND status = 'Active'`,
-      [email.toLowerCase()]
-    );
+  const { rows } = await db.query(
+  `SELECT id, first_name, last_name, email, role, password_hash
+  FROM users
+  WHERE email = $1`,
+  [email.toLowerCase()]
+  );
 
     if (rows.length === 0) {
       // Log failed login attempt
