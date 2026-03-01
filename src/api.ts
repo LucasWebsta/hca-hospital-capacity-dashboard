@@ -132,12 +132,12 @@ export interface CreateAlertRulePayload {
   window_minutes?: number;
 }
 
-/** Report configuration (facility, days, sections to include) */
+/** Report configuration (facility, days, sections to include). Sections match dashboard & forecast. */
 export interface ReportConfig {
   facilityId: number | null;
   facilityName: string;
   trendDays: number;
-  sections: ('overview' | 'trend' | 'forecast' | 'facilities' | 'alerts')[];
+  sections: ('overview' | 'map' | 'trend' | 'forecast' | 'forecastMetric' | 'facilities' | 'alerts')[];
 }
 
 /** Snapshot data: census, trend, forecast, facilities, alerts */
