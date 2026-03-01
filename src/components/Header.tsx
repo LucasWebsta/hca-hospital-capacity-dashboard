@@ -174,34 +174,6 @@ export function Header({ trendDays, onTrendDaysChange, onAlertsClick, onFacility
 
       {/* Right controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 6, flexShrink: 0 }}>
-        <Dropdown
-          label={TREND_DAYS.find(d => d.value === trendDays)?.label ?? 'Last 30 days'}
-          options={TREND_DAYS.map(d => d.label)}
-          onSelect={(v) => {
-            const match = TREND_DAYS.find(d => d.label === v);
-            if (match) {
-              onTrendDaysChange(match.value);
-              const user = getSessionUser();
-              const userId = user?.id != null ? Number(user.id) : null;
-              if (userId != null && !Number.isNaN(userId)) {
-                api.updateMyDefaultTrendDays(userId, match.value).then(() => {
-                  try {
-                    const raw = sessionStorage.getItem('user');
-                    if (raw) {
-                      const u = JSON.parse(raw);
-                      u.defaultTrendDays = match.value;
-                      sessionStorage.setItem('user', JSON.stringify(u));
-                    }
-                  } catch {
-                    // ignore
-                  }
-                }).catch((err) => {
-                  console.error('Failed to save default date range:', err?.message ?? err);
-                });
-              }
-            }
-          }}
-        />
 
         {/* Bell → Alerts */}
         <button

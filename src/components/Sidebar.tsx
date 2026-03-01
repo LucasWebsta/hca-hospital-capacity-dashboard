@@ -145,7 +145,6 @@ export function Sidebar({ activeTab, onTabChange, facilityName, isOpen = true, o
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName}</div>
                 <div style={{ fontSize: 10.5, color: '#7a9abd' }}>{role}</div>
               </div>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7a9abd" strokeWidth="2"><path d="m6 9 6 6 6-6"/></svg>
             </div>
           );
         })()}

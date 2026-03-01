@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Camera, X, Save, Edit2 } from 'lucide-react';
 import { api } from '../api';
 
@@ -211,11 +212,11 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
+        position: 'fixed', inset: 0, zIndex: 9999,
         background: 'rgba(9,34,64,0.45)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 16,
@@ -430,7 +431,7 @@ export function ProfileModal({ isOpen, onClose, onFacilityChange }: ProfileModal
         </div>
       </div>
     </div>
-  );
+  , document.body);
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
