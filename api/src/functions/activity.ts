@@ -56,4 +56,3 @@ app.http('activity', {
   handler: getActivityLogsHandler,
 });
 
-

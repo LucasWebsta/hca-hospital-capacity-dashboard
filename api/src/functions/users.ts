@@ -189,5 +189,3 @@ app.http('users-delete', {
   route: 'users/{id?}',
   handler: deleteUserHandler,
 });
-
-

@@ -72,8 +72,8 @@ export async function loginHandler(
       ]
     );
 
-    // Return user data (without password). canAccessAdmin lets login page route Kevin to admin panel.
-    const canAccessAdmin = (user.first_name || '').toLowerCase() === 'kevin';
+    // Return user data (without password). canAccessAdmin by role (align with server.mjs).
+    const canAccessAdmin = ['Super Admin', 'Regional Manager', 'Facility Administrator'].includes(user.role || '');
     return {
       status: 200,
       jsonBody: {
@@ -149,4 +149,3 @@ app.http('auth-logout', {
   route: 'auth/logout',
   handler: logoutHandler,
 });
-
