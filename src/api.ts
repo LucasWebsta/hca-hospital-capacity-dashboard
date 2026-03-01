@@ -195,4 +195,26 @@ export const api = {
       return r.json() as Promise<{ id: string; created_at: string }>;
     });
   },
+
+  /** Update current user's default date range (7, 14, 30, or 60 days). Persists to users.default_trend_days. */
+  updateMyDefaultTrendDays: (userId: number, defaultTrendDays: number) =>
+    fetch(`${BASE}/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, defaultTrendDays }),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ defaultTrendDays: number }>;
+    }),
+
+  /** Update current user's email and/or phone. Persists to users table. */
+  updateMyProfile: (userId: number, data: { email?: string; phoneNumber?: string | null }) =>
+    fetch(`${BASE}/users/me`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, ...data }),
+    }).then(async (r) => {
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `API error ${r.status}`);
+      return r.json() as Promise<{ email?: string; phoneNumber?: string | null }>;
+    }),
 };
