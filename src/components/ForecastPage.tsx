@@ -563,6 +563,95 @@ export default function ForecastPage() {
         </div>
       )}
 
+      {/* Forecast Chart */}
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 12,
+          border: "1px solid #edf0f5",
+          padding: "20px 22px",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+          marginBottom: 20,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 14,
+                color: "#0f172a",
+                marginBottom: 4,
+              }}
+            >
+              {selectedMetric} — {displayWindow === 'historical' ? 'Historical' : displayWindow === 'forecast' ? 'Forecast' : 'Historical + Forecast'} (Seasonality-Adjusted)
+            </div>
+            <div style={{ fontSize: 11.5, color: "#94a3b8" }}>
+              {facility?.location} · Trend-seasonal hybrid model with holiday adjustments
+            </div>
+          </div>
+        </div>
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <XAxis
+              dataKey="time"
+              tick={{ fontSize: 10, fill: "#94a3b8" }}
+              interval="preserveStartEnd"
+            />
+            <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
+            <Tooltip
+              contentStyle={{
+                fontSize: 12,
+                borderRadius: 8,
+                border: "1px solid #e2e8f0",
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {/* Divider line between historical and forecast (for 'both' view) */}
+            {dividerTime && (
+              <ReferenceLine 
+                x={dividerTime} 
+                stroke="#94a3b8" 
+                strokeWidth={1.5} 
+                strokeDasharray="3 3" 
+                label={{ value: 'Today', position: 'top', fill: '#64748b', fontSize: 10 }}
+              />
+            )}
+            <ReferenceLine
+              y={facility?.beds ? facility.beds * 0.9 : undefined}
+              stroke="#ef4444"
+              strokeDasharray="4 4"
+              label={{ value: "90% capacity", fill: "#ef4444", fontSize: 10 }}
+            />
+            {chartData.some(d => d.actual !== null) && (
+              <Line
+                type="monotone"
+                dataKey="actual"
+                stroke={displayWindow === 'historical' ? '#64748b' : BRAND_BLUE}
+                strokeWidth={2}
+                strokeDasharray={displayWindow === 'historical' ? '5 5' : 'none'}
+                dot={false}
+                name="Actual"
+                connectNulls={false}
+              />
+            )}
+            {chartData.some(d => d.forecast !== null) && (
+              <Line
+                type="monotone"
+                dataKey="forecast"
+                stroke={BRAND_ORANGE}
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                dot={false}
+                name="Forecast"
+                connectNulls={false}
+              />
+            )}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+
       {/* Staffing projection — updates when facility filter changes */}
       {facility && (
         <div
@@ -788,94 +877,6 @@ export default function ForecastPage() {
           </div>
         </div>
       )}
-
-      {/* Forecast Chart */}
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          border: "1px solid #edf0f5",
-          padding: "20px 22px",
-          boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div
-              style={{
-                fontWeight: 700,
-                fontSize: 14,
-                color: "#0f172a",
-                marginBottom: 4,
-              }}
-            >
-              {selectedMetric} — {displayWindow === 'historical' ? 'Historical' : displayWindow === 'forecast' ? 'Forecast' : 'Historical + Forecast'} (Seasonality-Adjusted)
-            </div>
-            <div style={{ fontSize: 11.5, color: "#94a3b8" }}>
-              {facility?.location} · Trend-seasonal hybrid model with holiday adjustments
-            </div>
-          </div>
-        </div>
-        <ResponsiveContainer width="100%" height={320}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-            <XAxis
-              dataKey="time"
-              tick={{ fontSize: 10, fill: "#94a3b8" }}
-              interval="preserveStartEnd"
-            />
-            <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} />
-            <Tooltip
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 8,
-                border: "1px solid #e2e8f0",
-              }}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            {/* Divider line between historical and forecast (for 'both' view) */}
-            {dividerTime && (
-              <ReferenceLine 
-                x={dividerTime} 
-                stroke="#94a3b8" 
-                strokeWidth={1.5} 
-                strokeDasharray="3 3" 
-                label={{ value: 'Today', position: 'top', fill: '#64748b', fontSize: 10 }}
-              />
-            )}
-            <ReferenceLine
-              y={facility?.beds ? facility.beds * 0.9 : undefined}
-              stroke="#ef4444"
-              strokeDasharray="4 4"
-              label={{ value: "90% capacity", fill: "#ef4444", fontSize: 10 }}
-            />
-            {chartData.some(d => d.actual !== null) && (
-              <Line
-                type="monotone"
-                dataKey="actual"
-                stroke={displayWindow === 'historical' ? '#64748b' : BRAND_BLUE}
-                strokeWidth={2}
-                strokeDasharray={displayWindow === 'historical' ? '5 5' : 'none'}
-                dot={false}
-                name="Actual"
-                connectNulls={false}
-              />
-            )}
-            {chartData.some(d => d.forecast !== null) && (
-              <Line
-                type="monotone"
-                dataKey="forecast"
-                stroke={BRAND_ORANGE}
-                strokeWidth={2}
-                strokeDasharray="5 5"
-                dot={false}
-                name="Forecast"
-                connectNulls={false}
-              />
-            )}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
     </div>
   );
 }
