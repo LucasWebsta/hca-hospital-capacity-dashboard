@@ -2,6 +2,27 @@
 
 A modern healthcare analytics dashboard built with React, TypeScript, and Tailwind CSS.
 
+## My Contribution — Forecasting & Predictive Analytics
+
+This project was built by a 4-person team for the 2026 UA Innovate Hackathon, where we placed 2nd out of 12 teams.
+
+My primary responsibility was the forecasting and predictive analytics portion of the application.
+
+I implemented:
+
+- OLS linear regression for hospital census forecasting
+- 80/20 train-test validation
+- 5-fold cross-validation
+- MAE, RMSE, and MAPE model evaluation
+- 80% and 95% prediction intervals
+- Forecast visualizations for patient census trends
+- Recent-trend and day-of-week adjustments
+
+### Relevant Code
+
+- [`api/src/functions/forecast.ts`](api/src/functions/forecast.ts) — forecasting model and validation
+- [`PREDICTIVE_CAPABILITY_QUALITY.md`](PREDICTIVE_CAPABILITY_QUALITY.md) — model methodology and validation details
+
 ## Overview
 
 This is a comprehensive hospital system management dashboard that displays:
