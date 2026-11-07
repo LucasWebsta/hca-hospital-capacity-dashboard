@@ -20,8 +20,17 @@ I implemented:
 
 ### Relevant Code
 
-- [`api/src/functions/forecast.ts`](api/src/functions/forecast.ts) — forecasting model and validation
-- [`PREDICTIVE_CAPABILITY_QUALITY.md`](PREDICTIVE_CAPABILITY_QUALITY.md) — model methodology and validation details
+src/components/ForecastPage.tsx — forecasting dashboard UI, updated to use the extracted aggregation utility.
+
+src/utils/aggregateForecast.ts — backend forecasting model and validation, reusable forecast data aggregation logic extracted from the main React component.
+
+src/utils/forecast.ts — consolidated duplicated linear regression calculations into a shared helper function.
+
+src/utils/loadData.ts — updated facility configuration for local development with synthetic data.
+
+api/src/functions/forecast.ts — backend forecasting model and validation.
+
+PREDICTIVE_CAPABILITY_QUALITY.md — forecasting methodology and validation documentation.
 
 ## Overview
 
@@ -126,3 +135,13 @@ Sidebar panel showing active alerts, notifications, and alert management control
 - Mobile-responsive improvements
 - Excel/CSV export functionality
 - Email alert notifications
+
+Post-Hackathon Improvements - 
+
+After the hackathon, I independently refactored the forecasting dashboard to improve code maintainability.
+
+Extracted forecast aggregation logic from the main React component into a reusable utility.
+
+Consolidated duplicated ordinary least squares regression calculations into a shared function.
+
+Verified the refactored application through a successful production build and local functionality testing.
