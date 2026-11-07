@@ -15,6 +15,24 @@ export interface ValidationMetrics {
     testSize: number;
 }
 
+function calculateTrendSlope(rows: MetricRow[]): number {
+    const base = rows[0].timestamp.getTime();
+
+    const points = rows.map(r => ({
+        x: (r.timestamp.getTime() - base) / (1000 * 60 * 15),
+        y: r.value,
+    }));
+
+    const n = points.length;
+    const sumX = points.reduce((a, p) => a + p.x, 0);
+    const sumY = points.reduce((a, p) => a + p.y, 0);
+    const sumXY = points.reduce((a, p) => a + p.x * p.y, 0);
+    const sumX2 = points.reduce((a, p) => a + p.x * p.x, 0);
+
+    return (n * sumXY - sumX * sumY) /
+           (n * sumX2 - sumX * sumX);
+}
+
 export function validateModel(
     rows: MetricRow[],
     orgId: number,
@@ -30,17 +48,7 @@ export function validateModel(
     const trainData = filtered.slice(0, splitIndex);
     const testData = filtered.slice(splitIndex);
 
-    const base = trainData[0].timestamp.getTime();
-    const points = trainData.map(r => ({
-        x: (r.timestamp.getTime() - base) / (1000 * 60 * 15),
-        y: r.value,
-    }));
-    const n = points.length;
-    const sumX = points.reduce((a, p) => a + p.x, 0);
-    const sumY = points.reduce((a, p) => a + p.y, 0);
-    const sumXY = points.reduce((a, p) => a + p.x * p.y, 0);
-    const sumX2 = points.reduce((a, p) => a + p.x * p.x, 0);
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const slope = calculateTrendSlope(trainData);
 
     const lastTrainTime = trainData[trainData.length - 1].timestamp.getTime();
     const oneDayMs = 24 * 60 * 60 * 1000;
@@ -86,17 +94,7 @@ export function forecastMetric(
     const trainData = filtered.slice(0, splitIndex);
     const testData = filtered.slice(splitIndex);
 
-    const base = filtered[0].timestamp.getTime();
-    const points = filtered.map(r => ({
-        x: (r.timestamp.getTime() - base) / (1000 * 60 * 15),
-        y: r.value,
-    }));
-    const n = points.length;
-    const sumX = points.reduce((a, p) => a + p.x, 0);
-    const sumY = points.reduce((a, p) => a + p.y, 0);
-    const sumXY = points.reduce((a, p) => a + p.x * p.y, 0);
-    const sumX2 = points.reduce((a, p) => a + p.x * p.x, 0);
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const slope = calculateTrendSlope(trainData);
 
     const lastTrainTime = trainData[trainData.length - 1].timestamp.getTime();
     const oneDayMs = 24 * 60 * 60 * 1000;
