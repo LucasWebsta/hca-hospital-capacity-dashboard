@@ -12,17 +12,14 @@ export interface MetricRow {
     value: number;
 }
 
-const FACILITY_INFO: Record<number, { location: string; beds: number; icuMax: number }> = {
-    12345: { location: 'Denver, CO', beds: 500, icuMax: 50 },
-    23456: { location: 'Austin, TX', beds: 768, icuMax: 80 },
-    34567: { location: 'Brownsville, TX', beds: 400, icuMax: 40 },
-    45678: { location: 'Hopewell, VA', beds: 132, icuMax: 20 },
-    56789: { location: 'Orlando, FL', beds: 458, icuMax: 60 },
-    67890: { location: 'Tampa, FL', beds: 664, icuMax: 66 },
-    78901: { location: 'Salt Lake City, UT', beds: 468, icuMax: 74 },
-    89012: { location: 'Myrtle Beach, SC', beds: 246, icuMax: 29 },
-    90123: { location: 'Nashville, TN', beds: 321, icuMax: 40 },
-    1234:  { location: 'Savannah, GA', beds: 381, icuMax: 45 },
+const FACILITY_INFO: Record<number, {
+  location: string;
+  beds: number;
+  icuMax: number;
+}> = {
+  1: { location: "Demo Hospital A", beds: 200, icuMax: 20 },
+  2: { location: "Demo Hospital B", beds: 300, icuMax: 30 },
+  3: { location: "Demo Hospital C", beds: 150, icuMax: 15 },
 };
 
 export async function loadFacilities(): Promise<Facility[]> {
