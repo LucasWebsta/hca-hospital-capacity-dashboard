@@ -20,17 +20,13 @@ I implemented:
 
 ### Relevant Code
 
-src/components/ForecastPage.tsx — forecasting dashboard UI, updated to use the extracted aggregation utility.
+- [`api/src/functions/forecast.ts`](api/src/functions/forecast.ts) — Backend forecasting model and validation.
+- [`PREDICTIVE_CAPABILITY_QUALITY.md`](PREDICTIVE_CAPABILITY_QUALITY.md) — Forecasting methodology and validation details.
+- [`ForecastPage.tsx`](src/components/ForecastPage.tsx) — Forecasting dashboard UI and integration with the extracted aggregation utility.
+- [`aggregateForecast.ts`](src/utils/aggregateForecast.ts) — Extracted reusable forecast aggregation logic, created backend forecasting model and validation.
+- [`forecast.ts`](src/utils/forecast.ts) — Consolidated duplicated linear regression calculations.
+- [`loadData.ts`](src/utils/loadData.ts) — Updated facility configuration for synthetic development data.
 
-src/utils/aggregateForecast.ts — backend forecasting model and validation, reusable forecast data aggregation logic extracted from the main React component.
-
-src/utils/forecast.ts — consolidated duplicated linear regression calculations into a shared helper function.
-
-src/utils/loadData.ts — updated facility configuration for local development with synthetic data.
-
-api/src/functions/forecast.ts — backend forecasting model and validation.
-
-PREDICTIVE_CAPABILITY_QUALITY.md — forecasting methodology and validation documentation.
 
 ## Overview
 
